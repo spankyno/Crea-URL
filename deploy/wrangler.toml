@@ -1,0 +1,20 @@
+name = "crea-url"
+main = "cloudflare-worker.ts"
+compatibility_date = "2024-09-23"
+
+# Frontend estático (dist/)
+[assets]
+directory = "../dist"
+binding = "ASSETS"
+
+# Cloudflare D1 (metadatos de páginas)
+[[d1_databases]]
+binding = "DB"
+database_name = "crea_url_db"
+database_id = "your-d1-database-id"
+
+# Variables de Supabase Storage (mejor como secrets en producción)
+# wrangler secret put SUPABASE_URL
+# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+[vars]
+SUPABASE_STORAGE_BUCKET = "html-pages"
