@@ -11,7 +11,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "crea_url_db"
-database_id = "your-d1-database-id"
+database_id = "cbc19ef1-6752-48cd-ac14-c2f986651193"
 
 # Variables de Supabase Storage (mejor como secrets en producción)
 # wrangler secret put SUPABASE_URL
