@@ -13,6 +13,35 @@ import { AboutModal } from './components/AboutModal';
 import { UserSession, PageItem, CollectionItem, StarterTemplate } from './types';
 import { api } from './services/api';
 import { FileCode, Eye } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
+
+const IS_CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+
+function ClerkUserSync({ onUserChange }: { onUserChange: (user: UserSession) => void }) {
+  const { isLoaded, isSignedIn, user } = useUser();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn && user) {
+      const email = user.primaryEmailAddress?.emailAddress;
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@host-html.com';
+      const isRoleAdmin =
+        user.publicMetadata?.role === 'admin' ||
+        (email && email.toLowerCase() === adminEmail.toLowerCase());
+
+      onUserChange({
+        id: user.id,
+        email: email || undefined,
+        name: user.fullName || user.username || 'Usuario Registrado',
+        role: isRoleAdmin ? 'admin' : 'user',
+        isRegistered: true,
+        avatarUrl: user.imageUrl,
+      });
+    }
+  }, [isLoaded, isSignedIn, user, onUserChange]);
+
+  return null;
+}
 
 const DEFAULT_STARTER_HTML = `<!DOCTYPE html>
 <html lang="es">
@@ -267,6 +296,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors ${darkMode ? 'bg-[#0b0f17] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      {IS_CLERK_ENABLED && <ClerkUserSync onUserChange={setCurrentUser} />}
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}

@@ -288,7 +288,7 @@ app.get('/api/pages', (req: Request, res: Response) => {
 });
 
 // 3. POST /api/pages - Upload & publish page
-app.post('/api/pages', (req: Request, res: Response) => {
+app.post('/api/pages', async (req: Request, res: Response) => {
   try {
     const {
       html,

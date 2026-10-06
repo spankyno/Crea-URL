@@ -1,61 +1,49 @@
 # Crea URL – Alojamiento y publicación de páginas HTML estáticas
 
-Sube, previsualiza y publica páginas HTML estáticas al instante con URLs limpias, sandbox seguro, colecciones, códigos QR y protección por contraseña.
+Sube, previsualiza y publica páginas HTML estáticas al instante con URLs limpias, sandbox seguro, colecciones, códigos QR, protección por contraseña y sistema de usuarios (Anónimo, Registrado y Administrador).
 
-## Requisitos
+> 📘 **Guía paso a paso**: Consulta [`INSTRUCTIONS.md`](INSTRUCTIONS.md) para las instrucciones detalladas de configuración de las cuentas gratuitas en **Supabase Storage**, **Clerk Auth** y despliegue en **Cloudflare Workers**.
 
-- Node.js 18+
-- Cuenta gratuita en [Supabase](https://supabase.com) (almacenamiento de los HTML)
+---
 
-## Configuración local
+## Sistema de Usuarios (Anónimo, Registrado, Administrador)
+
+- **Anónimo (Invitado)**: Permite publicar HTML al instante sin registrarse. Límite de 1 MB y retención de 15 días.
+- **Registrado (Pro Free)**: Autenticación mediante **Clerk Login** (Google, GitHub, Email). Límite ampliado a 10 MB, retención de 90 días (3 meses) y acceso al Dashboard de Colecciones.
+- **Administrador (SuperAdmin)**: Consola global (`/admin`) para supervisar métricas, buscar páginas de todos los usuarios y purgar páginas expiradas.
+
+---
+
+## Configuración Local
 
 1. Copia las variables de entorno:
-
 ```bash
 cp .env.example .env
 ```
 
-2. Rellena en `.env`:
+2. Rellena en `.env` tus credenciales de Supabase y Clerk (ver [`INSTRUCTIONS.md`](INSTRUCTIONS.md)):
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET=html-pages`
+- `VITE_CLERK_PUBLISHABLE_KEY` (opcional en local; si no se incluye, funciona en modo simulación)
 
-- `SUPABASE_URL` – URL de tu proyecto Supabase
-- `SUPABASE_SERVICE_ROLE_KEY` – clave `service_role` (Settings → API)
-- `SUPABASE_STORAGE_BUCKET` – nombre del bucket (por defecto `html-pages`)
-
-3. En el panel de Supabase:
-
-- Storage → **New bucket** → nombre `html-pages`
-- Marca el bucket como **Public** (o configura políticas de lectura pública)
-
-4. Instala dependencias y arranca:
-
+3. Instala dependencias y arranca:
 ```bash
 npm install
 npm run dev
 ```
+La aplicación estará en `http://localhost:3000`.
 
-La app estará en `http://localhost:3000`.
+---
 
-## Despliegue en Cloudflare
+## Despliegue en Cloudflare Workers
 
-Consulta la guía completa en [`deploy/README.md`](deploy/README.md).
+Consulta la guía completa de despliegue en [`deploy/README.md`](deploy/README.md).
 
-Resumen rápido (Worker + assets + D1 + Supabase):
-
+Resumen rápido:
 ```bash
 npm run build
 wrangler deploy --config deploy/wrangler.toml
 ```
 
-Configura como secrets/vars del Worker:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_STORAGE_BUCKET` (opcional, default `html-pages`)
-
-## Estructura
-
-- `src/` – frontend React (Vite)
-- `server.ts` – backend local (Express + Supabase Storage)
-- `deploy/cloudflare-worker.ts` – backend en Cloudflare Workers
-- `deploy/schema.sql` – esquema D1 (metadatos de páginas)
-- `functions/` – adaptador Pages Functions (si usas Opción A)
+> ⚡ **Nota de Solución POST 405**: Se ha añadido `run_worker_first = true` en `deploy/wrangler.toml` para solucionar el error `405 Method Not Allowed` en `/api/pages` al publicar desde Cloudflare Workers.

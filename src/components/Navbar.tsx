@@ -7,12 +7,11 @@ import {
   LayoutDashboard, 
   ShieldCheck, 
   Sparkles, 
-  User, 
-  LogOut,
   Moon,
   Sun,
   Plus
 } from 'lucide-react';
+import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 interface NavbarProps {
   currentTab: 'editor' | 'dashboard' | 'collections' | 'admin';
@@ -24,6 +23,8 @@ interface NavbarProps {
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
 }
+
+const IS_CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
@@ -38,7 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const switchUserRole = (role: 'anon' | 'user' | 'admin') => {
     if (role === 'anon') {
       setCurrentUser({
-        id: 'anon_guest',
+        id: 'anon_' + Math.random().toString(36).substring(2, 9),
         name: 'Invitado Anónimo',
         role: 'anon',
         isRegistered: false,
@@ -86,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links (Clean text links with active states) */}
+        {/* Zone 2: Navigation Links */}
         <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-800/80">
           <button
             onClick={() => setCurrentTab('editor')}
@@ -137,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Actions & Account Switcher (Clerk Simulation) */}
+        {/* Zone 3: Actions & Auth / Role Switcher */}
         <div className="flex items-center gap-2.5">
           <button
             onClick={onOpenTemplates}
@@ -148,13 +149,29 @@ export const Navbar: React.FC<NavbarProps> = ({
             Plantillas
           </button>
 
-          {/* User Role Switcher Dropdown (Clerk simulation) */}
+          {/* Real Clerk Auth Buttons if Key configured */}
+          {IS_CLERK_ENABLED ? (
+            <div className="flex items-center gap-2">
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 border border-emerald-800/60 hover:bg-emerald-900/60 rounded-lg transition-colors">
+                    Iniciar Sesión (Clerk)
+                  </button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </div>
+          ) : null}
+
+          {/* User Role Switcher Dropdown */}
           <div className="relative group">
             <button
               className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg transition-colors whitespace-nowrap"
-              title="Cambiar estado de sesión (Clerk Auth)"
+              title="Cambiar estado de sesión"
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className={`w-2 h-2 rounded-full ${currentUser.role === 'admin' ? 'bg-amber-400' : currentUser.role === 'user' ? 'bg-sky-400' : 'bg-emerald-500'} animate-pulse`} />
               <span className="max-w-[120px] truncate text-slate-200">{currentUser.name}</span>
               <span className="text-[10px] text-slate-400 uppercase font-mono">
                 {currentUser.role === 'anon' ? '15d' : '3m'}
@@ -164,7 +181,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Menu Dropdown */}
             <div className="absolute right-0 mt-1 w-56 p-1.5 bg-[#111827] border border-slate-800 rounded-xl shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 z-50">
               <div className="px-2.5 py-1.5 text-[11px] text-slate-400 border-b border-slate-800/80 mb-1">
-                Simular Usuario (Clerk Free)
+                {IS_CLERK_ENABLED ? 'Roles y Simulación' : 'Modo Demostración / Simulación'}
               </div>
               <button
                 onClick={() => switchUserRole('anon')}

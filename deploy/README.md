@@ -2,37 +2,47 @@
 
 Todo en un único proyecto: frontend + API + D1 (metadatos) + **Supabase Storage** (archivos HTML).
 
-## 1. Preparar Supabase (almacenamiento)
+> 📘 **Guía Completa**: Consulta [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) para el manual detallado de cuentas gratuitas (Supabase, Clerk y Cloudflare).
 
-1. Crea un proyecto en [supabase.com](https://supabase.com).
+---
+
+## 1. Solución al Error `POST 405 (Method Not Allowed)`
+
+En `deploy/wrangler.toml` se incluye `run_worker_first = true` bajo `[assets]`. Esto fuerza a Cloudflare Workers a procesar primero la lógica del Worker (`cloudflare-worker.ts`) para todas las peticiones `POST`, `GET`, `PATCH`, `DELETE` en `/api/*` y `/raw/*`, solucionando el fallo 405.
+
+---
+
+## 2. Preparar Supabase (Almacenamiento)
+
+1. Crea un proyecto gratuito en [supabase.com](https://supabase.com).
 2. Storage → **New bucket** → nombre `html-pages` → márcalo como **Public**.
 3. Settings → API → copia:
    - Project URL → `SUPABASE_URL`
    - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
 
-## 2. Crear la Base de Datos D1 (metadatos)
+---
+
+## 3. Crear la Base de Datos D1 (Metadatos de páginas)
 
 ```bash
 wrangler d1 create crea_url_db
 wrangler d1 execute crea_url_db --file=deploy/schema.sql --remote
 ```
 
-Guarda el `database_id` y ponlo en `deploy/wrangler.toml`.
+Guarda el `database_id` devuelto y ponlo en `deploy/wrangler.toml`.
 
-## 3. Configurar secrets del Worker
+---
+
+## 4. Configurar secretos del Worker
 
 ```bash
 wrangler secret put SUPABASE_URL --config deploy/wrangler.toml
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY --config deploy/wrangler.toml
 ```
 
-(Opcional) variable del bucket:
+---
 
-```bash
-# ya viene por defecto como "html-pages" en [vars]
-```
-
-## 4. Desplegar (Opción B – recomendada)
+## 5. Compilar y Desplegar
 
 ```bash
 npm run build
@@ -40,24 +50,7 @@ wrangler deploy --config deploy/wrangler.toml
 ```
 
 El Worker servirá:
-
-- La interfaz web
-- Las rutas `/api/*`
+- La interfaz web (React SPA)
+- Las rutas de API (`/api/pages`, `/api/collections`, `/api/admin/*`)
 - La entrega directa `/raw/:slug` desde Supabase Storage
-- Limpieza de páginas expiradas (cron)
-
-## Opción A: Cloudflare Pages + Functions
-
-1. Conecta el repo a Pages (build: `npm run build`, output: `dist`).
-2. En Settings → Bindings / Functions:
-   - D1: binding `DB` → `crea_url_db`
-3. Añade variables/secrets:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `SUPABASE_STORAGE_BUCKET` = `html-pages`
-4. Asegúrate de que existe `functions/[[route]].ts` (ya incluido).
-
-## Notas
-
-- Ya **no** se usa R2 ni Gemini.
-- Los metadatos de páginas viven en D1; el HTML en Supabase Storage.
+- Limpieza automática de páginas expiradas (cron)
