@@ -152,7 +152,13 @@ export default function App() {
   const [html, setHtml] = useState<string>(() => {
     try {
       const draft = localStorage.getItem('creaurl_draft_html');
-      if (draft) return draft;
+      if (draft) {
+        // Migración: borradores antiguos guardados con el enlace a host-html.com
+        return draft.replace(
+          /href=(["'])https?:\/\/(www\.)?host-html\.com\/?\1/g,
+          `href="${window.location.origin}/acerca-de"`
+        );
+      }
     } catch (e) {}
     return DEFAULT_STARTER_HTML;
   });
