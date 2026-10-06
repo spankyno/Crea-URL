@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acerca de Crea URL — Alojamiento gratuito de páginas HTML</title>
+  <meta name="description" content="Crea URL: pega código o sube un archivo HTML y obtén una URL pública, un código QR y colecciones en segundos. Sin git ni despliegues. Creado por Aitor Sánchez Gutiérrez.">
+  <meta name="author" content="Aitor Sánchez Gutiérrez">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <style>
+    :root {
+      --bg: #0b1120; --panel: #111a2e; --panel2: #0f172a; --border: #1e293b;
+      --text: #cbd5e1; --muted: #94a3b8; --title: #f8fafc; --accent: #34d399; --accent-ink: #052e16;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f8fafc; --panel: #ffffff; --panel2: #f1f5f9; --border: #e2e8f0;
+        --text: #334155; --muted: #64748b; --title: #0f172a; --accent: #059669; --accent-ink: #ffffff;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--accent); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+    header.top { border-bottom: 1px solid var(--border); }
+    header.top .wrap { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; padding-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+    .brand { font-weight: 700; color: var(--title); text-decoration: none; font-size: 18px; }
+    .brand span { color: var(--accent); }
+    nav a { margin-left: 16px; font-size: 14px; text-decoration: none; color: var(--muted); }
+    nav a:hover { color: var(--accent); }
+    .hero { padding: 56px 0 32px; }
+    .badge { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 3px 12px; }
+    h1 { color: var(--title); font-size: clamp(30px, 6vw, 48px); line-height: 1.15; margin: 16px 0 12px; }
+    h2 { color: var(--title); font-size: 24px; margin: 0 0 6px; }
+    h3 { color: var(--title); font-size: 17px; margin: 0 0 4px; }
+    .lead { font-size: 18px; color: var(--muted); max-width: 680px; }
+    .btn { display: inline-block; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-decoration: none; padding: 11px 22px; border-radius: 8px; margin-top: 10px; }
+    .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); margin-left: 8px; }
+    section { padding: 36px 0; border-top: 1px solid var(--border); }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+    ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 14px; }
+    ol.steps li { counter-increment: s; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 16px 62px; position: relative; }
+    ol.steps li::before { content: counter(s); position: absolute; left: 16px; top: 14px; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; display: grid; place-items: center; }
+    ol.steps p { margin: 0; font-size: 14.5px; color: var(--muted); }
+    .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+    table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+    th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    th { color: var(--title); background: var(--panel2); font-weight: 600; white-space: nowrap; }
+    td:first-child { color: var(--title); white-space: nowrap; }
+    .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); margin-left: 6px; }
+    code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--panel2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px; font-size: 13.5px; }
+    pre { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px; margin: 12px 0 0; }
+    details { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; }
+    summary { cursor: pointer; color: var(--title); font-weight: 600; }
+    details p { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; }
+    .links { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .links a.card { text-decoration: none; display: block; transition: border-color .2s; }
+    .links a.card:hover { border-color: var(--accent); }
+    .links .url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: var(--accent); word-break: break-all; margin-top: 6px; display: block; }
+    footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--muted); font-size: 14px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/">Crea <span>URL</span></a>
+      <nav>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#caracteristicas">Características</a>
+        <a href="#limites">Límites</a>
+        <a href="#stack">Stack</a>
+        <a href="#faq">Preguntas</a>
+        <a href="#autor">Autor</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <span class="badge">Alojamiento HTML gratuito</span>
+      <h1>Pega tu HTML. Obtén una URL.</h1>
+      <p class="lead">Crea URL aloja archivos HTML estáticos: pega el código o suelta un archivo, publica y recibe al instante un enlace limpio para compartir y un código QR. Sin git, sin repositorio y sin pipeline de despliegue.</p>
+      <a class="btn" href="/">Publicar una página</a>
+      <a class="btn ghost" href="#stack">Ver el stack</a>
+    </div>
+
+    <section id="como-funciona">
+      <h2>De HTML a URL en 5 segundos</h2>
+      <p class="sub">La forma más simple de publicar una página estática en internet.</p>
+      <ol class="steps">
+        <li><h3>Pega o sube tu HTML</h3><p>Escribe en el editor, pega código o arrastra un archivo <code>.html</code>. No necesitas herramientas de compilación ni archivos de configuración.</p></li>
+        <li><h3>Pulsa «Publicar»</h3><p>Valida el marcado, opcionalmente lo minifica y lo guarda. Puedes elegir un slug personalizado, proteger la página con contraseña o hacerla efímera.</p></li>
+        <li><h3>Comparte el enlace</h3><p>Recibes una URL pública <code>/p/tu-slug</code>, un enlace directo al HTML (<code>/raw/tu-slug</code>) y un código QR descargable para presentaciones, demos o landing pages.</p></li>
+      </ol>
+    </section>
+
+    <section id="caracteristicas">
+      <h2>Qué puedes hacer</h2>
+      <p class="sub">Lo justo para compartir una página, sin complicaciones.</p>
+      <div class="grid">
+        <div class="card"><h3>URL limpia al instante</h3><p>Slug aleatorio o personalizado (3–40 caracteres) para que el enlace sea fácil de recordar.</p></div>
+        <div class="card"><h3>Código QR</h3><p>Genera y descarga el QR de cualquier página publicada para llevarla a una pantalla, un cartel o una diapositiva.</p></div>
+        <div class="card"><h3>Colecciones</h3><p>Agrupa varias páginas bajo un único enlace <code>/c/nombre</code>: un portfolio, una muestra de prototipos o una entrega a un cliente.</p></div>
+        <div class="card"><h3>Protección con contraseña</h3><p>Restringe el acceso a una página. La contraseña se guarda como hash, nunca en claro.</p></div>
+        <div class="card"><h3>Modo efímero</h3><p>Páginas de autodestrucción que desaparecen a la hora de publicarse. Ideales para compartir algo temporal.</p></div>
+        <div class="card"><h3>Sandbox seguro</h3><p>Cada página se sirve aislada con una política CSP de <em>sandbox</em>, de modo que el contenido no puede acceder a la aplicación.</p></div>
+        <div class="card"><h3>Exportación ZIP</h3><p>Descarga tu página en un paquete <code>.zip</code> cuando quieras llevártela a otro sitio.</p></div>
+        <div class="card"><h3>Plantillas y validador</h3><p>Empieza desde plantillas listas para usar y revisa el marcado antes de publicar.</p></div>
+        <div class="card"><h3>API REST</h3><p>Publica también por HTTP con <code>POST /api/pages</code>, útil para scripts y automatizaciones.</p></div>
+      </div>
+    </section>
+
+    <section id="limites">
+      <h2>Límites y caducidad</h2>
+      <p class="sub">Según tengas o no una sesión iniciada.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Característica</th><th>Anónimo</th><th>Con cuenta</th></tr></thead>
+          <tbody>
+            <tr><td>Tamaño máximo por página</td><td>1 MB</td><td>10 MB</td></tr>
+            <tr><td>Duración de la página</td><td>15 días</td><td>90 días (ampliable)</td></tr>
+            <tr><td>Modo efímero</td><td>1 hora</td><td>1 hora</td></tr>
+            <tr><td>Número de páginas</td><td>Sin límite</td><td>Sin límite</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="comparativa">
+      <h2>Crea URL frente a otras opciones</h2>
+      <p class="sub">GitHub Pages, Netlify y Vercel son excelentes para aplicaciones en producción. Para compartir un único archivo HTML, hay un camino más corto.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Característica</th><th>Crea URL</th><th>GitHub Pages</th><th>Netlify / Vercel</th></tr></thead>
+          <tbody>
+            <tr><td>Sin git ni CLI</td><td>Sí</td><td>No</td><td>Parcial</td></tr>
+            <tr><td>Publicar pegando código</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Código QR integrado</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Un enlace para varias páginas</td><td>Sí (colecciones)</td><td>No</td><td>No</td></tr>
+            <tr><td>Contraseña y modo efímero</td><td>Sí</td><td>No</td><td>Según plan</td></tr>
+            <tr><td>Ideal para apps completas</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="stack">
+      <h2>Stack tecnológico</h2>
+      <p class="sub">Una aplicación en el borde (edge): interfaz estática, API en un Worker y almacenamiento separado para los metadatos y el HTML.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Capa</th><th>Tecnología</th><th>Para qué se usa</th></tr></thead>
+          <tbody>
+            <tr><td>Interfaz</td><td>React 19 · TypeScript · Vite</td><td>SPA con editor, vista previa, panel personal y administración.</td></tr>
+            <tr><td>Estilos</td><td>Tailwind CSS 4</td><td>Diseño responsive con tema oscuro.</td></tr>
+            <tr><td>Servidor / API</td><td>Cloudflare Workers</td><td>API REST, rutas <code>/raw</code> y entrega de la aplicación estática.</td></tr>
+            <tr><td>Base de datos</td><td>Cloudflare D1 (SQLite)</td><td>Metadatos de páginas y colecciones, caducidad y contadores de visitas.</td></tr>
+            <tr><td>Almacenamiento</td><td>Supabase Storage</td><td>Los archivos HTML publicados, en el bucket <code>html-pages</code>.</td></tr>
+            <tr><td>Autenticación</td><td>Clerk</td><td>Registro e inicio de sesión de usuarios.</td></tr>
+            <tr><td>Utilidades</td><td>JSZip · qrcode · lucide-react · motion</td><td>Exportación ZIP, códigos QR, iconos y animaciones.</td></tr>
+            <tr><td>Desarrollo local</td><td>Node.js · Express · tsx</td><td>Servidor de desarrollo que replica la API en local.</td></tr>
+            <tr><td>Despliegue</td><td>Wrangler · GitHub</td><td>Despliegue automático en Cloudflare con cada cambio en el repositorio.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre><code>Navegador ──► Cloudflare Worker ──┬─► D1 (metadatos)
+                                  └─► Supabase Storage (HTML)</code></pre>
+    </section>
+
+    <section id="faq">
+      <h2>Preguntas frecuentes</h2>
+      <p class="sub">Lo esencial sobre cómo funciona Crea URL.</p>
+      <details><summary>¿Qué es Crea URL?</summary><p>Una herramienta para poner un archivo HTML en internet en segundos: pegas el código o subes el archivo, publicas y obtienes un enlace compartible y un código QR.</p></details>
+      <details><summary>¿Necesito registrarme?</summary><p>No para publicar. Con una sesión iniciada obtienes un límite de tamaño mayor (10 MB) y una duración más larga (90 días) además de la gestión de tus páginas.</p></details>
+      <details><summary>¿Cuánto tiempo permanece activa una página?</summary><p>15 días si publicas de forma anónima y 90 días con cuenta, con opción de ampliar la caducidad. En modo efímero, la página desaparece pasada una hora.</p></details>
+      <details><summary>¿Es seguro el contenido que publico?</summary><p>Las páginas se sirven con una política de sandbox, de manera que no pueden acceder a la aplicación ni a datos de otros usuarios. Aun así, no publiques información sensible en páginas públicas.</p></details>
+      <details><summary>¿Qué son las colecciones?</summary><p>Una colección agrupa varias de tus páginas bajo un único enlace <code>/c/nombre</code>, con su propio título y descripción. Cada página sigue siendo independiente.</p></details>
+      <details><summary>¿Puedo publicar desde un script?</summary><p>Sí. La API acepta una petición <code>POST /api/pages</code> con el HTML en el cuerpo y devuelve la URL pública.</p></details>
+      <details><summary>¿Qué ocurre cuando caduca una página?</summary><p>Se elimina de forma automática, tanto el registro como el archivo almacenado. Puedes ampliar la caducidad antes de que ocurra.</p></details>
+    </section>
+
+    <section id="autor">
+      <h2>Autor y enlaces</h2>
+      <p class="sub">Crea URL está desarrollado por <strong style="color:var(--title)">Aitor Sánchez Gutiérrez</strong>, desarrollador de software y creador de herramientas web.</p>
+      <div class="links">
+        <a class="card" href="https://aitorsanchez.pages.dev" target="_blank" rel="noopener noreferrer"><h3>Blog personal</h3><p>Artículos y proyectos.</p><span class="url">aitorsanchez.pages.dev</span></a>
+        <a class="card" href="https://aitorhub.vercel.app" target="_blank" rel="noopener noreferrer"><h3>Aitor Hub</h3><p>Más aplicaciones y herramientas.</p><span class="url">aitorhub.vercel.app</span></a>
+        <a class="card" href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer"><h3>Contacto</h3><p>Escríbeme para dudas o sugerencias.</p><span class="url">aitorsanchez.pages.dev/contacto</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p style="margin:0 0 6px">Crea URL © 2026 · Autor: Aitor Sánchez Gutiérrez</p>
+      <p style="margin:0"><a href="/">Volver a Crea URL</a></p>
+    </div>
+  </footer>
+</body>
+</html>
