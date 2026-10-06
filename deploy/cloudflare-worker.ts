@@ -103,21 +103,25 @@ function jsonResponse(data: any, status = 200) {
   });
 }
 
+function cleanEnv(v: unknown): string {
+  return String(v ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
 function supabaseObjectUrl(env: Env, path: string): string {
-  const base = (env.SUPABASE_URL || '').trim().replace(/\/$/, '');
+  const raw = (env as any).SUPABASE_URL;
+  const base = cleanEnv(raw).replace(/\/+$/, '').replace(/\/storage\/v1.*$/, '');
   if (!base || !/^https?:\/\//i.test(base)) {
     throw new Error(
-      'SUPABASE_URL no está configurada en el Worker (o no empieza por https://). ' +
-        'Ejecuta: npx wrangler secret put SUPABASE_URL'
+      `SUPABASE_URL inválida. El Worker recibe: ${raw === undefined ? 'variable NO definida' : `"${String(raw).slice(0, 12)}…" (${String(raw).length} caracteres)`}. ` +
+        'Debe ser tipo "Secret" en Settings → Variables and Secrets (no en Build) y empezar por https://'
     );
   }
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY no está configurada en el Worker. ' +
-        'Ejecuta: npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY'
+      'SUPABASE_SERVICE_ROLE_KEY no definida en el Worker (Settings → Variables and Secrets, tipo Secret).'
     );
   }
-  const bucket = env.SUPABASE_STORAGE_BUCKET || 'html-pages';
+  const bucket = cleanEnv(env.SUPABASE_STORAGE_BUCKET) || 'html-pages';
   return `${base}/storage/v1/object/${bucket}/${path}`;
 }
 
@@ -125,7 +129,7 @@ async function supabaseUpload(env: Env, slug: string, html: string): Promise<voi
   const res = await fetch(supabaseObjectUrl(env, `${slug}.html`), {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)}`,
       'Content-Type': 'text/html; charset=utf-8',
       'x-upsert': 'true',
     },
@@ -141,7 +145,7 @@ async function supabaseDownload(env: Env, slug: string): Promise<string | null> 
   const res = await fetch(supabaseObjectUrl(env, `${slug}.html`), {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)}`,
     },
   });
   if (res.status === 404) return null;
@@ -156,7 +160,7 @@ async function supabaseDelete(env: Env, slug: string): Promise<void> {
   const res = await fetch(supabaseObjectUrl(env, `${slug}.html`), {
     method: 'DELETE',
     headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)}`,
     },
   });
   if (!res.ok && res.status !== 404) {
@@ -603,7 +607,14 @@ export default {
 
     // Fallback: static assets
     if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
+      const assetRes = await env.ASSETS.fetch(request);
+      // Rutas del cliente (/p/:slug, /c/:slug, /admin, /collections, /acerca-de...):
+      // si no hay archivo estático, servir la SPA para que React resuelva la ruta.
+      if (assetRes.status === 404 && request.method === 'GET' && !path.startsWith('/api/')) {
+        const indexReq = new Request(new URL('/index.html', url.origin).toString(), request);
+        return env.ASSETS.fetch(indexReq);
+      }
+      return assetRes;
     }
 
     return new Response('Crea URL Edge Engine Active', { status: 200 });
