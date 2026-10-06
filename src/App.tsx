@@ -9,7 +9,6 @@ import { AdminView } from './components/AdminView';
 import { PublicPageView } from './components/PublicPageView';
 import { TemplatesModal } from './components/TemplatesModal';
 import { Footer } from './components/Footer';
-import { AboutModal } from './components/AboutModal';
 import { UserSession, PageItem, CollectionItem, StarterTemplate } from './types';
 import { api } from './services/api';
 import { FileCode, Eye } from 'lucide-react';
@@ -181,7 +180,6 @@ export default function App() {
   const [publishedPage, setPublishedPage] = useState<PageItem | null>(null);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState<boolean>(false);
-  const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
   const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
   const [darkMode, setDarkMode] = useState<boolean>(true);
 
@@ -216,8 +214,6 @@ export default function App() {
         setCurrentTab('admin');
       } else if (path === '/dashboard') {
         setCurrentTab('dashboard');
-      } else if (path === '/acerca-de') {
-        setShowAboutModal(true);
       } else {
         setActiveSlug(null);
         setActiveCollectionSlug(null);
@@ -412,18 +408,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer onOpenAbout={() => setShowAboutModal(true)} />
-
-      {/* About Modal */}
-      <AboutModal
-        isOpen={showAboutModal}
-        onClose={() => {
-          setShowAboutModal(false);
-          if (window.location.pathname === '/acerca-de') {
-            window.history.pushState({}, '', '/');
-          }
-        }}
-      />
+      <Footer />
 
       {/* Publish Success Modal */}
       {publishedPage && (
