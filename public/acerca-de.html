@@ -70,9 +70,9 @@
     <div class="wrap">
       <a class="brand" href="/">Crea <span>URL</span></a>
       <nav>
-        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#como-se-usa">Cómo se usa</a>
         <a href="#caracteristicas">Características</a>
-        <a href="#limites">Límites</a>
+        <a href="#limites">Anónimo vs. registrado</a>
         <a href="#stack">Stack</a>
         <a href="#faq">Preguntas</a>
         <a href="#autor">Autor</a>
@@ -89,14 +89,22 @@
       <a class="btn ghost" href="#stack">Ver el stack</a>
     </div>
 
-    <section id="como-funciona">
-      <h2>De HTML a URL en 5 segundos</h2>
-      <p class="sub">La forma más simple de publicar una página estática en internet.</p>
+    <section id="como-se-usa">
+      <h2>Cómo se usa</h2>
+      <p class="sub">De HTML a URL en unos segundos. No necesitas cuenta para empezar.</p>
       <ol class="steps">
-        <li><h3>Pega o sube tu HTML</h3><p>Escribe en el editor, pega código o arrastra un archivo <code>.html</code>. No necesitas herramientas de compilación ni archivos de configuración.</p></li>
-        <li><h3>Pulsa «Publicar»</h3><p>Valida el marcado, opcionalmente lo minifica y lo guarda. Puedes elegir un slug personalizado, proteger la página con contraseña o hacerla efímera.</p></li>
-        <li><h3>Comparte el enlace</h3><p>Recibes una URL pública <code>/p/tu-slug</code>, un enlace directo al HTML (<code>/raw/tu-slug</code>) y un código QR descargable para presentaciones, demos o landing pages.</p></li>
+        <li><h3>Escribe, pega o sube tu HTML</h3><p>En el editor pega el código completo de tu página, o usa una de las <strong>plantillas</strong> del menú superior como punto de partida. Escribe un título para identificarla en tu panel. El indicador de tamaño muestra cuánto ocupa frente al límite de tu cuenta.</p></li>
+        <li><h3>Revisa la vista previa</h3><p>A la derecha ves el resultado en un entorno aislado (sandbox). Cambia entre vista de escritorio, tablet y móvil, recarga la vista o ábrela en una pestaña nueva. El borrador se guarda automáticamente en tu navegador.</p></li>
+        <li><h3>Ajusta las opciones (opcional)</h3><p>En «Configuración de URL y Seguridad» puedes elegir un <strong>slug personalizado</strong> (por ejemplo <code>mi-proyecto-web</code>), proteger la página con <strong>contraseña</strong> (requiere cuenta) o activar el <strong>modo efímero</strong>, que la elimina al cabo de una hora. También puedes minificar el HTML, descargarlo como <code>.html</code> o exportarlo como <code>.zip</code>.</p></li>
+        <li><h3>Pulsa «Publicar Página Gratis»</h3><p>Se valida el marcado y se publica. Recibes la URL pública <code>/p/tu-slug</code>, un enlace directo al HTML (<code>/raw/tu-slug</code>), un código QR descargable y la fecha hasta la que estará disponible.</p></li>
+        <li><h3>Gestiona tus páginas desde el Panel de Control</h3><p>Allí ves tus páginas con su tamaño, visitas, fecha de caducidad y si están protegidas. Para cada una puedes copiar el enlace, verla, generar su QR, configurar o quitar la contraseña, <strong>prorrogarla 90 días</strong> o eliminarla.</p></li>
+        <li><h3>Agrupa páginas en colecciones</h3><p>Crea una colección con título y descripción, añade tus páginas y comparte un único enlace <code>/c/nombre</code>: un portfolio, una muestra de prototipos o una entrega a un cliente.</p></li>
       </ol>
+      <h3 style="margin-top:26px">Publicar desde un script</h3>
+      <p class="sub" style="margin-bottom:0">También puedes publicar por HTTP. Envía el HTML en el cuerpo de una petición <code>POST /api/pages</code> y recibirás la URL de la página en la respuesta.</p>
+      <pre><code>curl -X POST https://crea-url.kbo1.workers.dev/api/pages \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Mi página","html":"&lt;h1&gt;Hola&lt;/h1&gt;"}'</code></pre>
     </section>
 
     <section id="caracteristicas">
@@ -116,19 +124,27 @@
     </section>
 
     <section id="limites">
-      <h2>Límites y caducidad</h2>
-      <p class="sub">Según tengas o no una sesión iniciada.</p>
+      <h2>Usuarios anónimos y registrados</h2>
+      <p class="sub">Puedes publicar sin cuenta. Registrarte es gratis y amplía los límites.</p>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Característica</th><th>Anónimo</th><th>Con cuenta</th></tr></thead>
+          <thead><tr><th>Característica</th><th>Anónimo (sin cuenta)</th><th>Registrado (gratuito)</th></tr></thead>
           <tbody>
-            <tr><td>Tamaño máximo por página</td><td>1 MB</td><td>10 MB</td></tr>
-            <tr><td>Duración de la página</td><td>15 días</td><td>90 días (ampliable)</td></tr>
-            <tr><td>Modo efímero</td><td>1 hora</td><td>1 hora</td></tr>
+            <tr><td>Publicar páginas</td><td>Sí</td><td>Sí</td></tr>
             <tr><td>Número de páginas</td><td>Sin límite</td><td>Sin límite</td></tr>
+            <tr><td>Tamaño máximo por página</td><td>1 MB</td><td>10 MB</td></tr>
+            <tr><td>Duración de la página</td><td>15 días</td><td>3 meses (90 días)</td></tr>
+            <tr><td>Prorrogar la caducidad</td><td>Sí, +90 días desde el panel</td><td>Sí, +90 días desde el panel</td></tr>
+            <tr><td>Modo efímero (1 hora)</td><td>Sí</td><td>Sí</td></tr>
+            <tr><td>Slug personalizado</td><td>Sí (3–40 caracteres)</td><td>Sí (3–40 caracteres)</td></tr>
+            <tr><td>Protección con contraseña</td><td>No</td><td>Sí</td></tr>
+            <tr><td>Código QR y exportación ZIP</td><td>Sí</td><td>Sí</td></tr>
+            <tr><td>Colecciones y panel de control</td><td>Sí, asociados a tu sesión en este navegador</td><td>Sí, asociados a tu cuenta</td></tr>
+            <tr><td>Espacio mostrado en el panel</td><td>5 MB</td><td>100 MB</td></tr>
           </tbody>
         </table>
       </div>
+      <p class="sub" style="margin-top:14px">Las páginas caducadas se eliminan automáticamente, tanto el registro como el archivo almacenado.</p>
     </section>
 
     <section id="comparativa">
@@ -176,8 +192,8 @@
       <h2>Preguntas frecuentes</h2>
       <p class="sub">Lo esencial sobre cómo funciona Crea URL.</p>
       <details><summary>¿Qué es Crea URL?</summary><p>Una herramienta para poner un archivo HTML en internet en segundos: pegas el código o subes el archivo, publicas y obtienes un enlace compartible y un código QR.</p></details>
-      <details><summary>¿Necesito registrarme?</summary><p>No para publicar. Con una sesión iniciada obtienes un límite de tamaño mayor (10 MB) y una duración más larga (90 días) además de la gestión de tus páginas.</p></details>
-      <details><summary>¿Cuánto tiempo permanece activa una página?</summary><p>15 días si publicas de forma anónima y 90 días con cuenta, con opción de ampliar la caducidad. En modo efímero, la página desaparece pasada una hora.</p></details>
+      <details><summary>¿Necesito registrarme?</summary><p>No para publicar. Con cuenta gratuita el tamaño máximo sube de 1 MB a 10 MB, las páginas duran 3 meses en lugar de 15 días y puedes protegerlas con contraseña.</p></details>
+      <details><summary>¿Cuánto tiempo permanece activa una página?</summary><p>15 días si publicas de forma anónima y 3 meses con cuenta, con opción de prorrogar +90 días desde el panel. En modo efímero, la página desaparece pasada una hora.</p></details>
       <details><summary>¿Es seguro el contenido que publico?</summary><p>Las páginas se sirven con una política de sandbox, de manera que no pueden acceder a la aplicación ni a datos de otros usuarios. Aun así, no publiques información sensible en páginas públicas.</p></details>
       <details><summary>¿Qué son las colecciones?</summary><p>Una colección agrupa varias de tus páginas bajo un único enlace <code>/c/nombre</code>, con su propio título y descripción. Cada página sigue siendo independiente.</p></details>
       <details><summary>¿Puedo publicar desde un script?</summary><p>Sí. La API acepta una petición <code>POST /api/pages</code> con el HTML en el cuerpo y devuelve la URL pública.</p></details>
