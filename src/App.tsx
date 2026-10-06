@@ -123,7 +123,7 @@ const DEFAULT_STARTER_HTML = `<!DOCTYPE html>
     <span class="badge">Alojamiento HTML Gratuito</span>
     <h1>¡Hola Mundo! Tu Página Web</h1>
     <p>Esta es tu página estática lista para ser publicada con URL limpia, código QR y sandbox seguro.</p>
-    <a href="https://host-html.com" class="btn" target="_blank">Aprender Más</a>
+    <a href="${typeof window !== 'undefined' ? window.location.origin : ''}/acerca-de" class="btn" target="_blank" rel="noopener">Aprender Más</a>
   </div>
 </body>
 </html>`;
