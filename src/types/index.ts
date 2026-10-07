@@ -28,6 +28,21 @@ export interface PageItem {
   collectionId?: string;
 }
 
+export interface PageStats {
+  slug: string;
+  title: string;
+  days: number;
+  series: { day: string; views: number }[];
+  totalViews: number;
+  viewsInRange: number;
+  viewsLast7: number;
+  viewsToday: number;
+  bestDay: { day: string; views: number } | null;
+  lastViewedAt: string | null;
+  createdAt: string;
+  viewsBeforeTracking: number;
+}
+
 export interface CollectionItem {
   id: string;
   slug: string;

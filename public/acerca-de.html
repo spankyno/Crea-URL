@@ -97,7 +97,7 @@
         <li><h3>Revisa la vista previa</h3><p>A la derecha ves el resultado en un entorno aislado (sandbox). Cambia entre vista de escritorio, tablet y móvil, recarga la vista o ábrela en una pestaña nueva. El borrador se guarda automáticamente en tu navegador.</p></li>
         <li><h3>Ajusta las opciones (opcional)</h3><p>En «Configuración de URL y Seguridad» puedes elegir un <strong>slug personalizado</strong> (por ejemplo <code>mi-proyecto-web</code>), proteger la página con <strong>contraseña</strong> (requiere cuenta) o activar el <strong>modo efímero</strong>, que la elimina al cabo de una hora. También puedes minificar el HTML, descargarlo como <code>.html</code> o exportarlo como <code>.zip</code>.</p></li>
         <li><h3>Pulsa «Publicar Página Gratis»</h3><p>Se valida el marcado y se publica. Recibes la URL pública <code>/p/tu-slug</code>, un enlace directo al HTML (<code>/raw/tu-slug</code>), un código QR descargable y la fecha hasta la que estará disponible.</p></li>
-        <li><h3>Gestiona tus páginas desde el Panel de Control</h3><p>Allí ves tus páginas con su tamaño, visitas, fecha de caducidad y si están protegidas. Para cada una puedes copiar el enlace, verla, generar su QR, configurar o quitar la contraseña, <strong>prorrogarla 90 días</strong> o eliminarla.</p></li>
+        <li><h3>Gestiona tus páginas desde el Panel de Control</h3><p>Allí ves tus páginas con su tamaño, visitas, fecha de caducidad y si están protegidas. Para cada una puedes copiar el enlace, verla, <strong>editar su contenido</strong> manteniendo la URL, consultar sus <strong>estadísticas de visitas</strong>, generar su QR, configurar o quitar la contraseña, <strong>prorrogarla 90 días</strong> o eliminarla. Las páginas que caducan pronto se resaltan con un aviso.</p></li>
         <li><h3>Agrupa páginas en colecciones</h3><p>Crea una colección con título y descripción, añade tus páginas y comparte un único enlace <code>/c/nombre</code>: un portfolio, una muestra de prototipos o una entrega a un cliente.</p></li>
       </ol>
       <h3 style="margin-top:26px">Publicar desde un script</h3>
@@ -119,6 +119,9 @@
         <div class="card"><h3>Sandbox seguro</h3><p>Cada página se sirve aislada con una política CSP de <em>sandbox</em>, de modo que el contenido no puede acceder a la aplicación.</p></div>
         <div class="card"><h3>Exportación ZIP</h3><p>Descarga tu página en un paquete <code>.zip</code> cuando quieras llevártela a otro sitio.</p></div>
         <div class="card"><h3>Plantillas y validador</h3><p>Empieza desde plantillas listas para usar y revisa el marcado antes de publicar.</p></div>
+        <div class="card"><h3>Edición sin cambiar la URL</h3><p>Modifica el contenido de una página ya publicada desde el panel. El enlace, el QR, la caducidad y la contraseña se mantienen.</p></div>
+        <div class="card"><h3>Estadísticas de visitas</h3><p>Gráfico de visitas por día (7, 30 o 90 días), visitas de hoy y de la última semana, y el mejor día. No se cuentan robots.</p></div>
+        <div class="card"><h3>Avisos de caducidad</h3><p>El panel destaca las páginas que caducan pronto y permite prorrogarlas todas de una vez.</p></div>
         <div class="card"><h3>API REST</h3><p>Publica también por HTTP con <code>POST /api/pages</code>, útil para scripts y automatizaciones.</p></div>
       </div>
     </section>

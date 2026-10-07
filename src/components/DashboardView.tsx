@@ -17,9 +17,10 @@ import {
   Sparkles,
   KeyRound,
   Pencil,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3
 } from 'lucide-react';
-import { PageItem, CollectionItem, UserSession } from '../types';
+import { PageItem, CollectionItem, UserSession, PageStats } from '../types';
 import { api } from '../services/api';
 import { formatBytes } from '../utils/htmlValidator';
 import { generateQrDataUrl, downloadQrImage } from '../utils/qr';
@@ -129,6 +130,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   const [isExtendingAll, setIsExtendingAll] = useState(false);
+
+  // Estadísticas de visitas
+  const [statsModalPage, setStatsModalPage] = useState<PageItem | null>(null);
+  const [stats, setStats] = useState<PageStats | null>(null);
+  const [statsDays, setStatsDays] = useState<7 | 30 | 90>(30);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  const loadStats = async (page: PageItem, days: 7 | 30 | 90) => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      setStats(await api.getPageStats(page.slug, days, currentUser));
+    } catch (err: any) {
+      setStats(null);
+      setStatsError(err.message || 'No se pudieron cargar las estadísticas');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleOpenStats = (page: PageItem) => {
+    setStatsModalPage(page);
+    setStats(null);
+    loadStats(page, statsDays);
+  };
+
+  const handleChangeStatsDays = (days: 7 | 30 | 90) => {
+    setStatsDays(days);
+    if (statsModalPage) loadStats(statsModalPage, days);
+  };
+
+  const formatDay = (day: string) =>
+    new Date(day + 'T00:00:00Z').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', timeZone: 'UTC' });
 
   const handleExtendAll = async (targets: PageItem[]) => {
     if (targets.length === 0) return;
@@ -447,6 +482,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </button>
 
                             <button
+                              onClick={() => handleOpenStats(p)}
+                              className="p-1.5 text-slate-400 hover:text-violet-400 hover:bg-slate-800 rounded transition-colors"
+                              title="Estadísticas de visitas"
+                            >
+                              <BarChart3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
                               onClick={() => onEditPage(p.slug)}
                               className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition-colors"
                               title="Editar contenido (misma URL)"
@@ -555,6 +598,137 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Modal */}
+      {statsModalPage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setStatsModalPage(null)}
+        >
+          <div
+            className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-violet-400 shrink-0" />
+                  <span className="truncate">Estadísticas · {statsModalPage.title || statsModalPage.slug}</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-mono mt-0.5">/p/{statsModalPage.slug}</p>
+              </div>
+              <div className="flex items-center gap-1 p-0.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0">
+                {([7, 30, 90] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => handleChangeStatsDays(d)}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      statsDays === d ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {d} días
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {statsLoading && <div className="py-12 text-center text-xs text-slate-400">Cargando estadísticas…</div>}
+
+            {statsError && !statsLoading && (
+              <div className="py-6 text-center text-xs text-rose-300 bg-rose-950/30 border border-rose-900/50 rounded-lg px-3">
+                {statsError}
+              </div>
+            )}
+
+            {stats && !statsLoading && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { label: 'Visitas totales', value: stats.totalViews },
+                    { label: `Últimos ${stats.days} días`, value: stats.viewsInRange },
+                    { label: 'Últimos 7 días', value: stats.viewsLast7 },
+                    { label: 'Hoy', value: stats.viewsToday },
+                  ].map((c) => (
+                    <div key={c.label} className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">{c.label}</div>
+                      <div className="text-xl font-bold text-white tabular-nums mt-0.5">{c.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {(() => {
+                  const max = Math.max(1, ...stats.series.map((x) => x.views));
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5">
+                        <span>Visitas por día</span>
+                        <span>máx. {max}</span>
+                      </div>
+                      <div
+                        className="flex items-end gap-[2px] h-36 px-1 border-b border-slate-700"
+                        role="img"
+                        aria-label={`Gráfico de visitas de los últimos ${stats.days} días`}
+                      >
+                        {stats.series.map((x) => (
+                          <div
+                            key={x.day}
+                            className="flex-1 flex items-end h-full group"
+                            title={`${formatDay(x.day)}: ${x.views} visita(s)`}
+                          >
+                            <div
+                              className={`w-full rounded-t-sm transition-colors ${
+                                x.views > 0 ? 'bg-violet-500 group-hover:bg-violet-300' : 'bg-slate-800'
+                              }`}
+                              style={{ height: x.views > 0 ? `${Math.max(4, (x.views / max) * 100)}%` : '2px' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
+                        <span>{formatDay(stats.series[0].day)}</span>
+                        <span>{formatDay(stats.series[Math.floor(stats.series.length / 2)].day)}</span>
+                        <span>{formatDay(stats.series[stats.series.length - 1].day)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="text-[11px] text-slate-400 space-y-1">
+                  {stats.bestDay && (
+                    <p>
+                      Mejor día del periodo: <strong className="text-slate-200">{formatDay(stats.bestDay.day)}</strong>{' '}
+                      con {stats.bestDay.views} visita(s).
+                    </p>
+                  )}
+                  {stats.lastViewedAt && (
+                    <p>
+                      Última visita:{' '}
+                      <strong className="text-slate-200">{new Date(stats.lastViewedAt).toLocaleString('es-ES')}</strong>
+                    </p>
+                  )}
+                  {stats.viewsBeforeTracking > 0 && (
+                    <p>
+                      {stats.viewsBeforeTracking} visita(s) son anteriores al seguimiento diario y solo cuentan en el total.
+                    </p>
+                  )}
+                  <p className="text-slate-500">
+                    Los días se cuentan en hora UTC. No se cuentan robots ni las vistas previas de redes sociales.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setStatsModalPage(null)}
+                className="px-3.5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

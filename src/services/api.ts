@@ -1,4 +1,4 @@
-import { PageItem, CollectionItem, PublishRequest, AdminStats, StarterTemplate, UserSession } from '../types';
+import { PageStats, PageItem, CollectionItem, PublishRequest, AdminStats, StarterTemplate, UserSession } from '../types';
 
 class ApiService {
   /**
@@ -56,6 +56,18 @@ class ApiService {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Contraseña incorrecta');
+    }
+    return res.json();
+  }
+
+  /** Estadísticas de visitas de una página propia (últimos N días, 7-90). */
+  async getPageStats(slug: string, days: number, user: UserSession): Promise<PageStats> {
+    const res = await fetch(`/api/pages/${encodeURIComponent(slug)}/stats?days=${days}`, {
+      headers: await this.getHeaders(user),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'No se pudieron cargar las estadísticas');
     }
     return res.json();
   }
