@@ -16,6 +16,23 @@ import { useUser } from '@clerk/clerk-react';
 
 const IS_CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
+const ANON_ID_KEY = 'creaurl_anon_id';
+
+function makeAnonSession(): UserSession {
+  let id = '';
+  try {
+    id = localStorage.getItem(ANON_ID_KEY) || '';
+  } catch (e) {}
+  if (!/^anon_[A-Za-z0-9]{4,32}$/.test(id)) {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    id = 'anon_' + Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+    try {
+      localStorage.setItem(ANON_ID_KEY, id);
+    } catch (e) {}
+  }
+  return { id, name: 'Invitado Anónimo', role: 'anon', isRegistered: false };
+}
+
 function ClerkUserSync({ onUserChange }: { onUserChange: (user: UserSession) => void }) {
   const { isLoaded, isSignedIn, user } = useUser();
 
@@ -36,6 +53,9 @@ function ClerkUserSync({ onUserChange }: { onUserChange: (user: UserSession) => 
         isRegistered: true,
         avatarUrl: user.imageUrl,
       });
+    } else {
+      // Sin sesión de Clerk: volver a invitado (conserva su id anónimo para ver sus páginas)
+      onUserChange(makeAnonSession());
     }
   }, [isLoaded, isSignedIn, user, onUserChange]);
 
@@ -135,17 +155,31 @@ export default function App() {
 
   // User state (Clerk simulation)
   const [currentUser, setCurrentUser] = useState<UserSession>(() => {
+    // En producción, las sesiones registradas solo existen con Clerk (el servidor las verifica)
+    if (!IS_CLERK_ENABLED && !import.meta.env.DEV) return makeAnonSession();
     try {
       const saved = localStorage.getItem('creaurl_user');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return {
-      id: 'anon_' + Math.random().toString(36).substring(2, 9),
-      name: 'Invitado Anónimo',
-      role: 'anon',
-      isRegistered: false,
-    };
+    return makeAnonSession();
   });
+
+  // Modo edición: slug de la página publicada que se está editando (null = página nueva)
+  const [editingSlug, setEditingSlug] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('creaurl_editing_slug') || null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [publishWasUpdate, setPublishWasUpdate] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      if (editingSlug) localStorage.setItem('creaurl_editing_slug', editingSlug);
+      else localStorage.removeItem('creaurl_editing_slug');
+    } catch (e) {}
+  }, [editingSlug]);
 
   // Editor states
   const [html, setHtml] = useState<string>(() => {
@@ -244,6 +278,7 @@ export default function App() {
   };
 
   const handleNewPage = () => {
+    setEditingSlug(null);
     setHtml(DEFAULT_STARTER_HTML);
     setTitle('');
     setDescription('');
@@ -252,6 +287,24 @@ export default function App() {
     setIsEphemeral(false);
     setCollectionId('');
     navigateTo('editor', '/');
+  };
+
+  // Cargar una página publicada en el editor para modificarla (misma URL)
+  const handleEditPage = async (slug: string) => {
+    try {
+      const { page, html: sourceHtml } = await api.getPageSource(slug, currentUser);
+      setHtml(sourceHtml);
+      setTitle(page.title || '');
+      setDescription(page.description || '');
+      setCustomSlug('');
+      setPassword('');
+      setIsEphemeral(false);
+      setCollectionId('');
+      setEditingSlug(slug);
+      navigateTo('editor', '/');
+    } catch (err: any) {
+      alert(err.message || 'No se pudo cargar la página para editarla');
+    }
   };
 
   // Publish Page Handler
@@ -263,6 +316,17 @@ export default function App() {
 
     setIsPublishing(true);
     try {
+      if (editingSlug) {
+        const upd = await api.updatePage(
+          editingSlug,
+          { html, title: title || 'Página Sin Título', description },
+          currentUser
+        );
+        setPublishWasUpdate(true);
+        setPublishedPage(upd.page);
+        return;
+      }
+      setPublishWasUpdate(false);
       const res = await api.publishPage(
         {
           html,
@@ -362,6 +426,8 @@ export default function App() {
                   currentUser={currentUser}
                   onPublish={handlePublish}
                   isPublishing={isPublishing}
+                  editingSlug={editingSlug}
+                  onCancelEdit={() => setEditingSlug(null)}
                   onOpenTemplates={() => setShowTemplatesModal(true)}
                 />
               </div>
@@ -381,6 +447,7 @@ export default function App() {
           <DashboardView
             currentUser={currentUser}
             onViewPage={handleViewPage}
+            onEditPage={handleEditPage}
             onViewCollection={handleViewCollection}
             onCreateNewPage={handleNewPage}
             onSwitchToCollections={() => setCurrentTab('collections')}
@@ -414,6 +481,7 @@ export default function App() {
       {publishedPage && (
         <PublishModal
           page={publishedPage}
+          isUpdate={publishWasUpdate}
           rawHtml={html}
           onClose={() => setPublishedPage(null)}
           onViewPage={(slug) => {

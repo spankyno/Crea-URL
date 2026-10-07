@@ -35,14 +35,349 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_STORAGE_BUCKET?: string;
+  // Autenticación (Clerk): se necesita CLERK_PUBLISHABLE_KEY o CLERK_ISSUER
+  CLERK_PUBLISHABLE_KEY?: string;
+  CLERK_ISSUER?: string; // p. ej. https://xxxx.clerk.accounts.dev
+  ADMIN_USER_IDS?: string; // ids de usuario de Clerk separados por comas
+  ADMIN_EMAILS?: string; // correos separados por comas (requiere claim "email" en el token)
+  // Contraseñas de página
+  PASSWORD_HASH_ITERATIONS?: string; // por defecto 50000; máximo 100000 (límite de Workers)
 }
 
-async function hashPassword(password: string): Promise<string> {
+// ---------------------------------------------------------------------------
+// Contraseñas de página: PBKDF2-SHA256 con sal aleatoria por página.
+// Formato almacenado: pbkdf2$<iteraciones>$<sal base64>$<hash base64>
+// Los hashes antiguos (SHA-256 hexadecimal de 64 caracteres) se siguen aceptando
+// y se actualizan automáticamente al formato nuevo tras un acceso correcto.
+// ---------------------------------------------------------------------------
+const MAX_PBKDF2_ITERATIONS = 100000; // límite de WebCrypto en Cloudflare Workers
+const DEFAULT_PBKDF2_ITERATIONS = 50000; // ≈7 ms de CPU: cabe en el plan gratuito (10 ms)
+
+function toBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a);
+  const eb = new TextEncoder().encode(b);
+  let diff = ea.length ^ eb.length;
+  const len = Math.max(ea.length, eb.length);
+  for (let i = 0; i < len; i++) diff |= (ea[i] || 0) ^ (eb[i] || 0);
+  return diff === 0;
+}
+
+async function pbkdf2(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt as unknown as BufferSource, iterations }, key, 256);
+  return new Uint8Array(bits);
+}
+
+function configuredIterations(env: Env): number {
+  const n = parseInt(env.PASSWORD_HASH_ITERATIONS || '', 10);
+  if (!Number.isFinite(n) || n < 1000) return DEFAULT_PBKDF2_ITERATIONS;
+  return Math.min(n, MAX_PBKDF2_ITERATIONS);
+}
+
+async function hashPassword(password: string, env: Env): Promise<string> {
+  const iterations = configuredIterations(env);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2(password, salt, iterations);
+  return `pbkdf2$${iterations}$${toBase64(salt)}$${toBase64(hash)}`;
+}
+
+async function legacySha256(password: string): Promise<string> {
   const data = new TextEncoder().encode(password + '_creaurl_salt');
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+async function verifyPassword(
+  password: string,
+  stored: string | null | undefined
+): Promise<{ ok: boolean; needsUpgrade: boolean }> {
+  if (!stored) return { ok: false, needsUpgrade: false };
+  if (stored.startsWith('pbkdf2$')) {
+    const [, iterStr, saltB64, hashB64] = stored.split('$');
+    const iterations = Math.min(parseInt(iterStr, 10) || 0, MAX_PBKDF2_ITERATIONS);
+    if (!iterations || !saltB64 || !hashB64) return { ok: false, needsUpgrade: false };
+    const computed = await pbkdf2(password, fromBase64(saltB64), iterations);
+    return { ok: timingSafeEqual(toBase64(computed), hashB64), needsUpgrade: false };
+  }
+  // Formato antiguo
+  const ok = timingSafeEqual(await legacySha256(password), stored);
+  return { ok, needsUpgrade: ok };
+}
+
+// ---------------------------------------------------------------------------
+// Identidad: se verifica el token de sesión de Clerk (JWT RS256) con las claves
+// públicas (JWKS) de Clerk. Las cabeceras x-user-role / x-admin-key YA NO se
+// aceptan: solo identifican a invitados anónimos mediante "anon_..."
+// ---------------------------------------------------------------------------
+type Role = 'anon' | 'user' | 'admin';
+
+interface Identity {
+  role: Role;
+  userId: string | null; // id de Clerk (registrado) o id anónimo "anon_xxx"
+  email?: string;
+  authenticated: boolean;
+  authConfigured: boolean;
+  error?: string; // token presente pero inválido
+}
+
+function b64urlToBytes(input: string): Uint8Array {
+  let b64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  return fromBase64(b64);
+}
+
+function b64urlToJson(input: string): any {
+  return JSON.parse(new TextDecoder().decode(b64urlToBytes(input)));
+}
+
+function clerkIssuer(env: Env): string | null {
+  const explicit = cleanEnv(env.CLERK_ISSUER).replace(/\/+$/, '');
+  if (explicit) return explicit;
+  const pk = cleanEnv(env.CLERK_PUBLISHABLE_KEY);
+  const m = pk.match(/^pk_(?:test|live)_(.+)$/);
+  if (!m) return null;
+  try {
+    const host = atob(m[1]).replace(/\$+$/, '').trim();
+    return host ? `https://${host}` : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+let jwksCache: { issuer: string; keys: any[]; fetchedAt: number } | null = null;
+const JWKS_TTL_MS = 60 * 60 * 1000;
+const JWKS_MIN_REFETCH_MS = 60 * 1000;
+
+async function getJwks(issuer: string, forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+  if (
+    jwksCache &&
+    jwksCache.issuer === issuer &&
+    now - jwksCache.fetchedAt < JWKS_TTL_MS &&
+    !(forceRefresh && now - jwksCache.fetchedAt > JWKS_MIN_REFETCH_MS)
+  ) {
+    return jwksCache.keys;
+  }
+  const res = await fetch(`${issuer}/.well-known/jwks.json`);
+  if (!res.ok) throw new Error(`No se pudo obtener las claves de Clerk (${res.status}).`);
+  const data: any = await res.json();
+  jwksCache = { issuer, keys: data.keys || [], fetchedAt: now };
+  return jwksCache.keys;
+}
+
+async function verifyClerkToken(token: string, issuer: string): Promise<any> {
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('Token con formato inválido.');
+  const header = b64urlToJson(parts[0]);
+  if (header.alg !== 'RS256') throw new Error('Algoritmo de token no permitido.');
+
+  let keys = await getJwks(issuer);
+  let jwk = keys.find((k: any) => k.kid === header.kid);
+  if (!jwk) {
+    keys = await getJwks(issuer, true);
+    jwk = keys.find((k: any) => k.kid === header.kid);
+  }
+  if (!jwk) throw new Error('Clave de firma desconocida.');
+
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify']
+  );
+  const valid = await crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    b64urlToBytes(parts[2]) as unknown as BufferSource,
+    new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+  );
+  if (!valid) throw new Error('Firma del token inválida.');
+
+  const claims = b64urlToJson(parts[1]);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const leeway = 10;
+  if (typeof claims.exp !== 'number' || claims.exp + leeway < nowSec) throw new Error('El token ha caducado.');
+  if (typeof claims.nbf === 'number' && claims.nbf - leeway > nowSec) throw new Error('El token aún no es válido.');
+  if (claims.iss !== issuer) throw new Error('Emisor del token no reconocido.');
+  if (!claims.sub) throw new Error('Token sin usuario.');
+  return claims;
+}
+
+function csvList(v: string | undefined): string[] {
+  return cleanEnv(v)
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const ANON_ID_RE = /^anon_[A-Za-z0-9]{4,32}$/;
+
+async function resolveIdentity(request: Request, env: Env): Promise<Identity> {
+  const issuer = clerkIssuer(env);
+  const authConfigured = Boolean(issuer);
+  const authHeader = request.headers.get('authorization') || '';
+  const bearer = authHeader.match(/^Bearer\s+(.+)$/i);
+
+  if (bearer && issuer) {
+    try {
+      const claims = await verifyClerkToken(bearer[1].trim(), issuer);
+      const email: string | undefined =
+        claims.email || claims.email_address || claims.primary_email_address || undefined;
+      const adminIds = csvList(env.ADMIN_USER_IDS);
+      const adminEmails = csvList(env.ADMIN_EMAILS);
+      const metaRole = claims.public_metadata?.role ?? claims.metadata?.role ?? claims.role;
+      const isAdminUser =
+        adminIds.includes(String(claims.sub).toLowerCase()) ||
+        (email ? adminEmails.includes(email.toLowerCase()) : false) ||
+        metaRole === 'admin';
+      return {
+        role: isAdminUser ? 'admin' : 'user',
+        userId: String(claims.sub),
+        email,
+        authenticated: true,
+        authConfigured,
+      };
+    } catch (err: any) {
+      return {
+        role: 'anon',
+        userId: null,
+        authenticated: false,
+        authConfigured,
+        error: `Sesión no válida: ${err.message}`,
+      };
+    }
+  }
+
+  if (bearer && !issuer) {
+    console.warn('Authorization recibido pero el Worker no tiene CLERK_PUBLISHABLE_KEY ni CLERK_ISSUER: se trata como anónimo.');
+  }
+
+  const claimedId = request.headers.get('x-user-id') || '';
+  return {
+    role: 'anon',
+    userId: ANON_ID_RE.test(claimedId) ? claimedId : null,
+    authenticated: false,
+    authConfigured,
+  };
+}
+
+function canManage(identity: Identity, ownerId: string | null | undefined): boolean {
+  if (identity.role === 'admin') return true;
+  return Boolean(identity.userId && ownerId && identity.userId === ownerId);
+}
+
+// ---------------------------------------------------------------------------
+// Límite de peticiones (rate limiting) con ventanas fijas en D1.
+// La tabla se crea sola la primera vez. Si D1 falla, se deja pasar la petición
+// (fail-open) para no tumbar la aplicación.
+// ---------------------------------------------------------------------------
+let rateTableReady = false;
+
+async function ensureRateTable(env: Env): Promise<void> {
+  if (rateTableReady) return;
+  await env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, window_end INTEGER NOT NULL)'
+  )
+    .bind()
+    .run();
+  rateTableReady = true;
+}
+
+function clientIp(request: Request): string {
+  return request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+}
+
+function windowKey(bucket: string, windowSec: number): { key: string; windowEnd: number; retryAfter: number } {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const start = Math.floor(nowSec / windowSec) * windowSec;
+  return { key: `${bucket}:${start}`, windowEnd: start + windowSec, retryAfter: start + windowSec - nowSec };
+}
+
+/** Registra un intento y devuelve si se ha superado el límite. */
+async function rateHit(
+  env: Env,
+  bucket: string,
+  limit: number,
+  windowSec: number
+): Promise<{ limited: boolean; retryAfter: number }> {
+  const { key, windowEnd, retryAfter } = windowKey(bucket, windowSec);
+  try {
+    await ensureRateTable(env);
+    const row = await env.DB.prepare(
+      'INSERT INTO rate_limits (key, count, window_end) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count = count + 1 RETURNING count'
+    )
+      .bind(key, windowEnd)
+      .first<any>();
+    return { limited: (row?.count || 0) > limit, retryAfter };
+  } catch (err) {
+    console.error('rateHit falló (se deja pasar):', err);
+    return { limited: false, retryAfter };
+  }
+}
+
+/** Consulta sin incrementar. */
+async function ratePeek(
+  env: Env,
+  bucket: string,
+  limit: number,
+  windowSec: number
+): Promise<{ limited: boolean; retryAfter: number }> {
+  const { key, retryAfter } = windowKey(bucket, windowSec);
+  try {
+    await ensureRateTable(env);
+    const row = await env.DB.prepare('SELECT count FROM rate_limits WHERE key = ?').bind(key).first<any>();
+    return { limited: (row?.count || 0) >= limit, retryAfter };
+  } catch (err) {
+    console.error('ratePeek falló (se deja pasar):', err);
+    return { limited: false, retryAfter };
+  }
+}
+
+function tooManyRequests(message: string, retryAfter: number): Response {
+  return new Response(JSON.stringify({ error: message, retryAfterSeconds: retryAfter }), {
+    status: 429,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': String(retryAfter),
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+// Límites
+const PUBLISH_LIMIT_ANON = 10; // por IP y hora
+const PUBLISH_LIMIT_USER = 60; // por usuario y hora
+const COLLECTION_LIMIT = 20; // por identidad/IP y hora
+const EDIT_LIMIT_ANON = 30; // ediciones por hora
+const EDIT_LIMIT_USER = 120;
+const UNLOCK_FAIL_LIMIT = 10; // contraseñas erróneas por IP+página cada 15 min
+const UNLOCK_WINDOW_SEC = 15 * 60;
+
+async function purgeRateLimits(env: Env): Promise<void> {
+  try {
+    await ensureRateTable(env);
+    await env.DB.prepare('DELETE FROM rate_limits WHERE window_end < ?')
+      .bind(Math.floor(Date.now() / 1000))
+      .run();
+  } catch (err) {
+    console.error('purgeRateLimits falló:', err);
+  }
 }
 
 function mapPage(p: any) {
@@ -84,11 +419,159 @@ function mapCollection(c: any) {
   };
 }
 
-function isAdmin(request: Request): boolean {
-  return (
-    request.headers.get('x-user-role') === 'admin' ||
-    request.headers.get('x-admin-key') === 'admin-secret-creaurl'
-  );
+
+const MAX_SIZE_ANON = 1 * 1024 * 1024; // 1 MB
+const MAX_SIZE_REGISTERED = 10 * 1024 * 1024; // 10 MB
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_PASSWORD_LENGTH = 128;
+const SLUG_MIN = 3;
+const SLUG_MAX = 40;
+const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+function randomSlug(length = 8): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => SLUG_CHARS[b % SLUG_CHARS.length]).join('');
+}
+
+function formatMB(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(2);
+}
+
+// Máximo de páginas a purgar por ejecución. Cada una cuesta una petición a Supabase y
+// Workers limita las subpeticiones por invocación (50 en el plan gratuito).
+const PURGE_BATCH = 40;
+
+async function purgeExpired(env: Env): Promise<{ purged: number; failed: number; pending: number }> {
+  const nowIso = new Date().toISOString();
+  const expired = await env.DB.prepare('SELECT slug FROM pages WHERE expires_at < ? ORDER BY expires_at ASC LIMIT ?')
+    .bind(nowIso, PURGE_BATCH)
+    .all<any>();
+
+  const deletedSlugs: string[] = [];
+  let failed = 0;
+  for (const row of expired.results || []) {
+    try {
+      await supabaseDelete(env, row.slug); // 404 se considera correcto (ya no existe)
+      deletedSlugs.push(row.slug);
+    } catch (err) {
+      // No borramos el registro: se reintentará en la próxima ejecución
+      failed++;
+      console.error(`purgeExpired: no se pudo borrar ${row.slug}:`, err);
+    }
+  }
+
+  if (deletedSlugs.length > 0) {
+    const placeholders = deletedSlugs.map(() => '?').join(',');
+    await env.DB.prepare(`DELETE FROM pages WHERE slug IN (${placeholders})`)
+      .bind(...deletedSlugs)
+      .run();
+  }
+
+  const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM pages WHERE expires_at < ?').bind(nowIso).first<any>();
+  return { purged: deletedSlugs.length, failed, pending: left?.n || 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Vista previa al compartir (Open Graph / Twitter): para /p/:slug y /c/:slug el
+// Worker sirve el index.html de la SPA con las etiquetas de esa página, de modo que
+// WhatsApp, Slack, LinkedIn, etc. muestren su título y descripción.
+// ---------------------------------------------------------------------------
+function escapeHtml(v: string): string {
+  return v
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function shortText(v: unknown, max: number): string {
+  const t = String(v ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
+}
+
+function injectShareMeta(
+  html: string,
+  meta: { title: string; description: string; url: string; type: string }
+): string {
+  const t = escapeHtml(meta.title);
+  const d = escapeHtml(meta.description);
+  const u = escapeHtml(meta.url);
+  let out = html
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${t}</title>`)
+    .replace(/<meta\s+name="description"[^>]*>/i, '')
+    .replace(/<meta\s+property="og:(?:title|description|type|url)"[^>]*>/gi, '')
+    .replace(/<meta\s+name="twitter:(?:card|title|description)"[^>]*>/gi, '');
+  const tags = [
+    `<meta name="description" content="${d}" />`,
+    `<meta property="og:site_name" content="Crea URL" />`,
+    `<meta property="og:type" content="${escapeHtml(meta.type)}" />`,
+    `<meta property="og:title" content="${t}" />`,
+    `<meta property="og:description" content="${d}" />`,
+    `<meta property="og:url" content="${u}" />`,
+    `<meta name="twitter:card" content="summary" />`,
+    `<meta name="twitter:title" content="${t}" />`,
+    `<meta name="twitter:description" content="${d}" />`,
+    `<link rel="canonical" href="${u}" />`,
+  ].join('\n    ');
+  return out.replace(/<\/head>/i, `    ${tags}\n  </head>`);
+}
+
+async function servePreview(request: Request, env: Env, kind: 'p' | 'c', slug: string): Promise<Response | null> {
+  if (!env.ASSETS) return null;
+  const url = new URL(request.url);
+  try {
+    let title = '';
+    let description = '';
+
+    if (kind === 'p') {
+      const p = await env.DB.prepare('SELECT title, description, expires_at, has_password FROM pages WHERE slug = ?')
+        .bind(slug)
+        .first<any>();
+      if (!p || (p.expires_at && new Date(p.expires_at) < new Date())) return null;
+      if (p.has_password) {
+        // No filtramos título ni descripción de páginas protegidas
+        title = 'Página protegida · Crea URL';
+        description = 'Esta página está protegida con contraseña.';
+      } else {
+        title = `${shortText(p.title, 90) || 'Página publicada'} · Crea URL`;
+        description = shortText(p.description, 200) || 'Página HTML publicada con Crea URL.';
+      }
+    } else {
+      const c = await env.DB.prepare('SELECT title, description FROM collections WHERE slug = ?')
+        .bind(slug)
+        .first<any>();
+      if (!c) return null;
+      title = `${shortText(c.title, 90) || 'Colección'} · Crea URL`;
+      description = shortText(c.description, 200) || 'Colección de páginas HTML publicada con Crea URL.';
+    }
+
+    const indexUrl = new URL('/index.html', url.origin).toString();
+    let indexRes = await env.ASSETS.fetch(new Request(indexUrl));
+    if (indexRes.status >= 300 && indexRes.status < 400) {
+      indexRes = await env.ASSETS.fetch(new Request(new URL('/', url.origin).toString()));
+    }
+    if (!indexRes.ok) return null;
+
+    const html = injectShareMeta(await indexRes.text(), {
+      title,
+      description,
+      url: `${url.origin}/${kind}/${slug}`,
+      type: kind === 'p' ? 'article' : 'website',
+    });
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (err) {
+    console.error('servePreview falló (se sirve la SPA normal):', err);
+    return null;
+  }
 }
 
 function jsonResponse(data: any, status = 200) {
@@ -97,8 +580,8 @@ function jsonResponse(data: any, status = 200) {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id, x-user-role, x-user-email, x-admin-key',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
     },
   });
 }
@@ -178,10 +661,19 @@ export default {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id, x-user-role, x-user-email, x-admin-key',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
         },
       });
+    }
+
+    // Identidad verificada (solo en rutas de la API)
+    let identity: Identity = { role: 'anon', userId: null, authenticated: false, authConfigured: false };
+    if (path.startsWith('/api/')) {
+      identity = await resolveIdentity(request, env);
+      if (identity.error) {
+        return jsonResponse({ error: identity.error, code: 'invalid_session' }, 401);
+      }
     }
 
     // 1. Direct raw HTML serving: /raw/:slug
@@ -204,10 +696,8 @@ export default {
       }
 
       if (pageResult.has_password) {
-        const pwd = url.searchParams.get('pwd');
-        if (!pwd || (await hashPassword(pwd)) !== pageResult.password_hash) {
-          return Response.redirect(`${url.origin}/p/${slug}?protected=1`, 302);
-        }
+        // La contraseña ya no viaja en la URL: se pide en la página /p/:slug (formulario POST)
+        return Response.redirect(`${url.origin}/p/${slug}?protected=1`, 302);
       }
 
       const html = await supabaseDownload(env, slug);
@@ -231,9 +721,19 @@ export default {
     }
 
     // 2. API Routes
+    if (path === '/api/me' && request.method === 'GET') {
+      return jsonResponse({
+        role: identity.role,
+        userId: identity.userId,
+        email: identity.email || null,
+        authenticated: identity.authenticated,
+        authConfigured: identity.authConfigured,
+      });
+    }
+
     if (path === '/api/pages' && request.method === 'GET') {
-      const userRole = request.headers.get('x-user-role') || 'anon';
-      const userId = request.headers.get('x-user-id');
+      const userRole = identity.role;
+      const userId = identity.userId;
 
       let query = 'SELECT * FROM pages ORDER BY created_at DESC';
       let results: any[] = [];
@@ -274,34 +774,122 @@ export default {
 
     if (path === '/api/pages' && request.method === 'POST') {
       try {
-        const body: any = await request.json();
-        const { html, title, description = '', customSlug, password, isEphemeral = false, collectionId } = body;
+        const userRole = identity.role;
+        const maxSize = userRole === 'anon' ? MAX_SIZE_ANON : MAX_SIZE_REGISTERED;
 
-        if (!html) {
+        // Límite de publicaciones por hora
+        if (identity.role !== 'admin') {
+          const rl =
+            identity.role === 'anon'
+              ? await rateHit(env, `publish:ip:${clientIp(request)}`, PUBLISH_LIMIT_ANON, 3600)
+              : await rateHit(env, `publish:u:${identity.userId}`, PUBLISH_LIMIT_USER, 3600);
+          if (rl.limited) {
+            return tooManyRequests(
+              `Has alcanzado el límite de publicaciones por hora${identity.role === 'anon' ? ' para invitados. Inicia sesión para publicar más' : ''}. Inténtalo de nuevo en ${Math.ceil(rl.retryAfter / 60)} min.`,
+              rl.retryAfter
+            );
+          }
+        }
+
+        // Rechazo temprano por Content-Length (margen de 64 KB para el JSON que envuelve al HTML)
+        const declaredLength = Number(request.headers.get('content-length') || 0);
+        if (declaredLength > maxSize + 64 * 1024) {
+          return jsonResponse(
+            {
+              error: `El tamaño de la petición (${formatMB(declaredLength)} MB) supera el límite permitido (${formatMB(maxSize)} MB).${userRole === 'anon' ? ' Inicia sesión para subir hasta 10 MB.' : ''}`,
+            },
+            413
+          );
+        }
+
+        let body: any;
+        try {
+          body = await request.json();
+        } catch (_) {
+          return jsonResponse({ error: 'El cuerpo de la petición no es un JSON válido.' }, 400);
+        }
+        const { html, description = '', customSlug, password, isEphemeral = false, collectionId } = body || {};
+        const rawTitle = typeof body?.title === 'string' ? body.title.trim() : '';
+
+        if (typeof html !== 'string' || html.trim().length === 0) {
           return jsonResponse({ error: 'El contenido HTML no puede estar vacío.' }, 400);
         }
 
-        const userRole = request.headers.get('x-user-role') || 'anon';
-        const userId =
-          request.headers.get('x-user-id') || `anon_${Math.random().toString(36).substring(2, 8)}`;
-        const userEmail = request.headers.get('x-user-email') || undefined;
+        const sizeBytes = new TextEncoder().encode(html).length;
+        if (sizeBytes > maxSize) {
+          return jsonResponse(
+            {
+              error: `El tamaño del archivo (${formatMB(sizeBytes)} MB) supera el límite permitido (${formatMB(maxSize)} MB).${userRole === 'anon' ? ' Inicia sesión para subir hasta 10 MB.' : ''}`,
+            },
+            413
+          );
+        }
 
-        const slug =
-          (customSlug &&
-            String(customSlug)
-              .toLowerCase()
-              .replace(/[^a-z0-9-]/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '')) ||
-          Math.random().toString(36).substring(2, 10);
+        if (rawTitle.length > MAX_TITLE_LENGTH) {
+          return jsonResponse({ error: `El título no puede superar los ${MAX_TITLE_LENGTH} caracteres.` }, 400);
+        }
+        if (typeof description !== 'string' || description.length > MAX_DESCRIPTION_LENGTH) {
+          return jsonResponse({ error: `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.` }, 400);
+        }
+        const title = rawTitle;
 
-        const existing = await env.DB.prepare('SELECT id FROM pages WHERE slug = ?').bind(slug).first();
-        if (existing) {
-          return jsonResponse({ error: 'Ese slug ya está en uso.' }, 409);
+        if (password !== undefined && password !== null && password !== '') {
+          if (typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) {
+            return jsonResponse({ error: `La contraseña no puede superar los ${MAX_PASSWORD_LENGTH} caracteres.` }, 400);
+          }
+          if (userRole === 'anon' && password.trim().length > 0) {
+            return jsonResponse({ error: 'Proteger con contraseña requiere una cuenta gratuita.' }, 403);
+          }
+        }
+
+        const userId = identity.userId || `anon_${randomSlug(8)}`;
+        const userEmail = identity.email || undefined;
+
+        // Slug: personalizado (3-40 caracteres) o aleatorio
+        let slug = '';
+        if (customSlug !== undefined && customSlug !== null && String(customSlug).trim() !== '') {
+          slug = String(customSlug)
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9-_]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^[-_]+|[-_]+$/g, '');
+          if (slug.length < SLUG_MIN || slug.length > SLUG_MAX) {
+            return jsonResponse(
+              { error: `El slug personalizado debe tener entre ${SLUG_MIN} y ${SLUG_MAX} caracteres alfanuméricos.` },
+              400
+            );
+          }
+          const existing = await env.DB.prepare('SELECT id FROM pages WHERE slug = ?').bind(slug).first();
+          if (existing) {
+            return jsonResponse({ error: 'Este slug ya está en uso. Por favor elige otro.' }, 409);
+          }
+        } else {
+          for (let attempt = 0; attempt < 10; attempt++) {
+            const candidate = randomSlug(8);
+            const taken = await env.DB.prepare('SELECT id FROM pages WHERE slug = ?').bind(candidate).first();
+            if (!taken) {
+              slug = candidate;
+              break;
+            }
+          }
+          if (!slug) {
+            return jsonResponse({ error: 'No se pudo generar un slug único. Inténtalo de nuevo.' }, 500);
+          }
+        }
+
+        // Si se publica dentro de una colección, debe ser del propio usuario
+        if (collectionId) {
+          const col0 = await env.DB.prepare('SELECT user_id FROM collections WHERE id = ? OR slug = ?')
+            .bind(collectionId, collectionId)
+            .first<any>();
+          if (col0 && !canManage(identity, col0.user_id)) {
+            return jsonResponse({ error: 'No tienes permiso para añadir páginas a esa colección.' }, 403);
+          }
         }
 
         const hasPassword = Boolean(password && String(password).trim().length > 0);
-        const passwordHash = hasPassword ? await hashPassword(String(password).trim()) : null;
+        const passwordHash = hasPassword ? await hashPassword(String(password).trim(), env) : null;
 
         await supabaseUpload(env, slug, html);
 
@@ -316,7 +904,6 @@ export default {
         }
 
         const pageId = crypto.randomUUID();
-        const sizeBytes = new TextEncoder().encode(html).length;
 
         await env.DB.prepare(
           `INSERT INTO pages (id, slug, title, description, size_bytes, user_id, user_email, user_role, created_at, updated_at, expires_at, is_ephemeral, has_password, password_hash, views_count, collection_id)
@@ -389,6 +976,9 @@ export default {
       const slug = decodeURIComponent(pageMatch[1]);
       const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
       if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+      if (p.expires_at && new Date(p.expires_at) < new Date()) {
+        return jsonResponse({ error: 'Esta página ha expirado.' }, 410);
+      }
 
       let html: string | undefined;
       if (!p.has_password) {
@@ -415,16 +1005,136 @@ export default {
       });
     }
 
+    // GET /api/pages/:slug/source  (solo propietario o admin): HTML original para editarlo
+    const sourceMatch = path.match(/^\/api\/pages\/([^/]+)\/source$/);
+    if (sourceMatch && request.method === 'GET') {
+      const slug = decodeURIComponent(sourceMatch[1]);
+      const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
+      if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+      if (!canManage(identity, p.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para editar esta página.' }, 403);
+      }
+      const html = await supabaseDownload(env, slug);
+      if (html === null) return jsonResponse({ error: 'Contenido no encontrado en Supabase Storage.' }, 404);
+      return jsonResponse({ page: mapPage(p), html });
+    }
+
+    // PUT /api/pages/:slug  (solo propietario o admin): actualiza contenido, título y descripción
+    // manteniendo la misma URL, caducidad, contraseña y colección.
+    if (pageMatch && request.method === 'PUT') {
+      try {
+        const slug = decodeURIComponent(pageMatch[1]);
+        const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
+        if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+        if (!canManage(identity, p.user_id)) {
+          return jsonResponse({ error: 'No tienes permiso para editar esta página.' }, 403);
+        }
+        if (p.expires_at && new Date(p.expires_at) < new Date()) {
+          return jsonResponse({ error: 'Esta página ha caducado. Prorrógala desde el panel antes de editarla.' }, 410);
+        }
+
+        if (identity.role !== 'admin') {
+          const who = identity.userId ? `u:${identity.userId}` : `ip:${clientIp(request)}`;
+          const rl = await rateHit(env, `edit:${who}`, identity.role === 'anon' ? EDIT_LIMIT_ANON : EDIT_LIMIT_USER, 3600);
+          if (rl.limited) {
+            return tooManyRequests(
+              `Has alcanzado el límite de ediciones por hora. Inténtalo de nuevo en ${Math.ceil(rl.retryAfter / 60)} min.`,
+              rl.retryAfter
+            );
+          }
+        }
+
+        const maxSize = identity.role === 'anon' ? MAX_SIZE_ANON : MAX_SIZE_REGISTERED;
+        const declaredLength = Number(request.headers.get('content-length') || 0);
+        if (declaredLength > maxSize + 64 * 1024) {
+          return jsonResponse(
+            { error: `El tamaño de la petición supera el límite permitido (${formatMB(maxSize)} MB).` },
+            413
+          );
+        }
+
+        let body: any;
+        try {
+          body = await request.json();
+        } catch (_) {
+          return jsonResponse({ error: 'El cuerpo de la petición no es un JSON válido.' }, 400);
+        }
+
+        const updates: { html?: string; title: string; description: string; sizeBytes: number } = {
+          title: p.title,
+          description: p.description,
+          sizeBytes: p.size_bytes,
+        };
+
+        if (body?.title !== undefined) {
+          const t = typeof body.title === 'string' ? body.title.trim() : '';
+          if (t.length > MAX_TITLE_LENGTH) {
+            return jsonResponse({ error: `El título no puede superar los ${MAX_TITLE_LENGTH} caracteres.` }, 400);
+          }
+          updates.title = t;
+        }
+        if (body?.description !== undefined) {
+          if (typeof body.description !== 'string' || body.description.length > MAX_DESCRIPTION_LENGTH) {
+            return jsonResponse({ error: `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.` }, 400);
+          }
+          updates.description = body.description;
+        }
+        if (body?.html !== undefined) {
+          if (typeof body.html !== 'string' || body.html.trim().length === 0) {
+            return jsonResponse({ error: 'El contenido HTML no puede estar vacío.' }, 400);
+          }
+          const sizeBytes = new TextEncoder().encode(body.html).length;
+          if (sizeBytes > maxSize) {
+            return jsonResponse(
+              {
+                error: `El tamaño del archivo (${formatMB(sizeBytes)} MB) supera el límite permitido (${formatMB(maxSize)} MB).${identity.role === 'anon' ? ' Inicia sesión para subir hasta 10 MB.' : ''}`,
+              },
+              413
+            );
+          }
+          updates.html = body.html;
+          updates.sizeBytes = sizeBytes;
+        }
+
+        if (updates.html !== undefined) {
+          await supabaseUpload(env, slug, updates.html);
+        }
+        const nowIso = new Date().toISOString();
+        await env.DB.prepare(
+          'UPDATE pages SET title = ?, description = ?, size_bytes = ?, updated_at = ? WHERE slug = ?'
+        )
+          .bind(updates.title, updates.description, updates.sizeBytes, nowIso, slug)
+          .run();
+
+        return jsonResponse({
+          success: true,
+          page: mapPage({
+            ...p,
+            title: updates.title,
+            description: updates.description,
+            size_bytes: updates.sizeBytes,
+            updated_at: nowIso,
+          }),
+        });
+      } catch (err: any) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
     // DELETE /api/pages/:slug
     if (pageMatch && request.method === 'DELETE') {
       const slug = decodeURIComponent(pageMatch[1]);
       const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
       if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
 
+      if (!canManage(identity, p.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para eliminar esta página.' }, 403);
+      }
+
       try {
         await supabaseDelete(env, slug);
-      } catch (_) {
-        /* ignore storage errors on delete */
+      } catch (err) {
+        console.error(`DELETE ${slug}: no se pudo borrar el archivo de Storage:`, err);
       }
       await env.DB.prepare('DELETE FROM pages WHERE slug = ?').bind(slug).run();
       return jsonResponse({ success: true });
@@ -438,9 +1148,35 @@ export default {
         const body: any = await request.json().catch(() => ({}));
         const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
         if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+        if (p.expires_at && new Date(p.expires_at) < new Date()) {
+          return jsonResponse({ error: 'Esta página ha expirado.' }, 410);
+        }
         if (p.has_password) {
-          if (!body.password || (await hashPassword(body.password)) !== p.password_hash) {
+          const attemptBucket = `unlock:${clientIp(request)}:${slug}`;
+          const peek = await ratePeek(env, attemptBucket, UNLOCK_FAIL_LIMIT, UNLOCK_WINDOW_SEC);
+          if (peek.limited) {
+            return tooManyRequests(
+              `Demasiados intentos fallidos. Inténtalo de nuevo en ${Math.ceil(peek.retryAfter / 60)} min.`,
+              peek.retryAfter
+            );
+          }
+          const supplied = typeof body.password === 'string' ? body.password : '';
+          const check = supplied && supplied.length <= MAX_PASSWORD_LENGTH
+            ? await verifyPassword(supplied, p.password_hash)
+            : { ok: false, needsUpgrade: false };
+          if (!check.ok) {
+            await rateHit(env, attemptBucket, UNLOCK_FAIL_LIMIT, UNLOCK_WINDOW_SEC);
             return jsonResponse({ error: 'Contraseña incorrecta. Acceso denegado.' }, 401);
+          }
+          if (check.needsUpgrade) {
+            // Migración transparente del hash antiguo al formato PBKDF2
+            try {
+              await env.DB.prepare('UPDATE pages SET password_hash = ? WHERE slug = ?')
+                .bind(await hashPassword(supplied, env), slug)
+                .run();
+            } catch (err) {
+              console.error('No se pudo actualizar el hash de la contraseña:', err);
+            }
           }
         }
         const html = await supabaseDownload(env, slug);
@@ -460,6 +1196,9 @@ export default {
       const slug = decodeURIComponent(extendMatch[1]);
       const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
       if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+      if (!canManage(identity, p.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para modificar esta página.' }, 403);
+      }
       const base = Math.max(Date.now(), new Date(p.expires_at).getTime());
       const newExpiry = new Date(base + 90 * 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
@@ -476,8 +1215,17 @@ export default {
       const body: any = await request.json().catch(() => ({}));
       const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
       if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+      if (!canManage(identity, p.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para modificar esta página.' }, 403);
+      }
       const has = Boolean(body.password && String(body.password).trim().length > 0);
-      const hash = has ? await hashPassword(String(body.password).trim()) : null;
+      if (has && identity.role === 'anon') {
+        return jsonResponse({ error: 'Proteger con contraseña requiere una cuenta gratuita.' }, 403);
+      }
+      if (has && String(body.password).length > MAX_PASSWORD_LENGTH) {
+        return jsonResponse({ error: `La contraseña no puede superar los ${MAX_PASSWORD_LENGTH} caracteres.` }, 400);
+      }
+      const hash = has ? await hashPassword(String(body.password).trim(), env) : null;
       const nowIso = new Date().toISOString();
       await env.DB.prepare('UPDATE pages SET has_password = ?, password_hash = ?, updated_at = ? WHERE slug = ?')
         .bind(has ? 1 : 0, hash, nowIso, slug)
@@ -487,8 +1235,8 @@ export default {
 
     // --- Collections ---
     if (path === '/api/collections' && request.method === 'GET') {
-      const userRole = request.headers.get('x-user-role') || 'anon';
-      const userId = request.headers.get('x-user-id');
+      const userRole = identity.role;
+      const userId = identity.userId;
       let rows: any[] = [];
       if (userRole === 'admin') {
         rows = (await env.DB.prepare('SELECT * FROM collections ORDER BY created_at DESC').bind().all<any>()).results || [];
@@ -508,8 +1256,18 @@ export default {
         if (!title || !String(title).trim()) {
           return jsonResponse({ error: 'El título de la colección es obligatorio.' }, 400);
         }
-        const userId = request.headers.get('x-user-id') || 'anon';
-        const userEmail = request.headers.get('x-user-email') || null;
+        if (identity.role !== 'admin') {
+          const who = identity.userId ? `u:${identity.userId}` : `ip:${clientIp(request)}`;
+          const rl = await rateHit(env, `collection:${who}`, COLLECTION_LIMIT, 3600);
+          if (rl.limited) {
+            return tooManyRequests(
+              `Has alcanzado el límite de colecciones por hora. Inténtalo de nuevo en ${Math.ceil(rl.retryAfter / 60)} min.`,
+              rl.retryAfter
+            );
+          }
+        }
+        const userId = identity.userId || `anon_${randomSlug(8)}`;
+        const userEmail = identity.email || null;
         const slug =
           customSlug && String(customSlug).trim()
             ? String(customSlug).toLowerCase().trim().replace(/[^a-z0-9-_]/g, '-')
@@ -553,8 +1311,11 @@ export default {
     }
     if (colMatch && request.method === 'DELETE') {
       const slug = decodeURIComponent(colMatch[1]);
-      const c = await env.DB.prepare('SELECT id FROM collections WHERE slug = ?').bind(slug).first<any>();
+      const c = await env.DB.prepare('SELECT id, user_id FROM collections WHERE slug = ?').bind(slug).first<any>();
       if (!c) return jsonResponse({ error: 'Colección no encontrada' }, 404);
+      if (!canManage(identity, c.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para eliminar esta colección.' }, 403);
+      }
       await env.DB.prepare('DELETE FROM collections WHERE slug = ?').bind(slug).run();
       await env.DB.prepare('UPDATE pages SET collection_id = NULL WHERE collection_id = ? OR collection_id = ?')
         .bind(c.id, slug)
@@ -564,7 +1325,7 @@ export default {
 
     // --- Admin ---
     if (path === '/api/admin/stats' && request.method === 'GET') {
-      if (!isAdmin(request)) return jsonResponse({ error: 'Acceso no autorizado al panel de administración.' }, 403);
+      if (identity.role !== 'admin') return jsonResponse({ error: 'Acceso no autorizado al panel de administración.' }, 403);
       const nowIso = new Date().toISOString();
       const row = await env.DB.prepare(
         `SELECT COUNT(*) AS total, COALESCE(SUM(views_count),0) AS views, COALESCE(SUM(size_bytes),0) AS size,
@@ -590,15 +1351,20 @@ export default {
     }
 
     if (path === '/api/admin/purge-expired' && request.method === 'POST') {
-      if (!isAdmin(request)) return jsonResponse({ error: 'Acceso denegado.' }, 403);
-      const nowIso = new Date().toISOString();
-      const expired = await env.DB.prepare('SELECT slug FROM pages WHERE expires_at < ?').bind(nowIso).all<any>();
-      for (const e of expired.results || []) {
-        try { await supabaseDelete(env, e.slug); } catch (_) {}
+      if (identity.role !== 'admin') return jsonResponse({ error: 'Acceso denegado.' }, 403);
+      try {
+        const { purged, failed, pending } = await purgeExpired(env);
+        const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM pages').bind().first<any>();
+        return jsonResponse({
+          success: true,
+          purgedCount: purged,
+          failedCount: failed,
+          pendingExpired: pending,
+          remainingPages: left?.n || 0,
+        });
+      } catch (err: any) {
+        return jsonResponse({ error: err.message }, 500);
       }
-      await env.DB.prepare('DELETE FROM pages WHERE expires_at < ?').bind(nowIso).run();
-      const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM pages').bind().first<any>();
-      return jsonResponse({ success: true, purgedCount: (expired.results || []).length, remainingPages: left?.n || 0 });
     }
 
     if (path === '/api/templates' && request.method === 'GET') {
@@ -607,6 +1373,13 @@ export default {
 
     // Fallback: static assets
     if (env.ASSETS) {
+      if (request.method === 'GET') {
+        const shareMatch = path.match(/^\/(p|c)\/([^/]+)\/?$/);
+        if (shareMatch) {
+          const preview = await servePreview(request, env, shareMatch[1] as 'p' | 'c', decodeURIComponent(shareMatch[2]));
+          if (preview) return preview;
+        }
+      }
       const assetRes = await env.ASSETS.fetch(request);
       // Rutas del cliente (/p/:slug, /c/:slug, /admin, /collections, /acerca-de...):
       // si no hay archivo estático, servir la SPA para que React resuelva la ruta.
@@ -621,17 +1394,12 @@ export default {
   },
 
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
-    const now = new Date().toISOString();
-    const expiredPages = await env.DB.prepare('SELECT slug FROM pages WHERE expires_at < ?')
-      .bind(now)
-      .all<any>();
-    for (const page of expiredPages.results || []) {
-      try {
-        await supabaseDelete(env, page.slug);
-      } catch (_) {
-        /* ignore */
-      }
+    try {
+      await purgeRateLimits(env);
+      const { purged, failed, pending } = await purgeExpired(env);
+      console.log(`Limpieza programada: ${purged} borradas, ${failed} con error, ${pending} caducadas pendientes.`);
+    } catch (err) {
+      console.error('Limpieza programada fallida:', err);
     }
-    await env.DB.prepare('DELETE FROM pages WHERE expires_at < ?').bind(now).run();
   },
 };

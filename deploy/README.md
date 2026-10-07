@@ -54,3 +54,40 @@ El Worker servirá:
 - Las rutas de API (`/api/pages`, `/api/collections`, `/api/admin/*`)
 - La entrega directa `/raw/:slug` desde Supabase Storage
 - Limpieza automática de páginas expiradas (cron)
+
+
+---
+
+## Variables de entorno del Worker (producción)
+
+Se configuran en **Cloudflare → Workers & Pages → crea-url → Settings → Variables and Secrets**
+(la sección de ejecución, no la de *Build*). `wrangler.toml` incluye `keep_vars = true`, así que los
+despliegues no las borran.
+
+| Variable | Tipo | Obligatoria | Descripción |
+|---|---|---|---|
+| `SUPABASE_URL` | Secret | Sí | `https://xxxx.supabase.co` (sin `/storage/...` ni barra final) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | Sí | Clave `service_role` (nunca la `anon`) |
+| `CLERK_PUBLISHABLE_KEY` | Text | Sí | La misma `pk_test_...` / `pk_live_...` del frontend. De ella se deduce el emisor y las claves públicas para **verificar el token de sesión** |
+| `ADMIN_USER_IDS` | Text | Para el panel admin | IDs de usuario de Clerk (`user_...`) separados por comas |
+| `ADMIN_EMAILS` | Text | No | Correos admin (requiere añadir el claim `email` en *Clerk → Sessions → Customize session token*) |
+| `CLERK_ISSUER` | Text | No | Solo si usas un dominio propio de Clerk y no quieres derivarlo de la clave |
+| `PASSWORD_HASH_ITERATIONS` | Text | No | Iteraciones PBKDF2 (por defecto 50000; máx. 100000). Si ves el error 1102 en el plan gratuito, bájalo a 20000 |
+
+**Comprobar la configuración** (con sesión iniciada, en la consola del navegador):
+
+```js
+fetch('/api/me',{headers:{Authorization:'Bearer '+await Clerk.session.getToken()}}).then(r=>r.json()).then(console.log)
+```
+
+Debe mostrar `authConfigured: true`, tu `userId` y `role` (`admin` si tu ID está en `ADMIN_USER_IDS`).
+
+## Seguridad y límites
+
+- **Identidad:** el Worker verifica la firma (RS256) del JWT de Clerk. Las cabeceras `x-user-role` / `x-admin-key` ya no se aceptan; `x-user-id` solo identifica a invitados (`anon_...`).
+- **Propiedad:** solo el dueño (o un admin) puede editar, prorrogar, cambiar la contraseña o borrar una página o colección.
+- **Contraseñas de página:** PBKDF2-SHA256 con sal aleatoria. Los hashes antiguos se migran solos al primer acceso correcto. La clave nunca viaja por la URL.
+- **Límites de peticiones** (tabla `rate_limits` en D1, se crea sola): publicar 10/h (anónimo, por IP) y 60/h (con cuenta); editar 30/h y 120/h; colecciones 20/h; 10 contraseñas erróneas por IP y página cada 15 min.
+- **Tamaño y caducidad:** anónimo 1 MB / 15 días; registrado 10 MB / 90 días. Cron horario (`[triggers]` en `wrangler.toml`) que elimina páginas caducadas (archivo en Supabase y registro en D1).
+
+> `server.ts` (servidor local de desarrollo) sigue confiando en cabeceras: no lo uses en producción.

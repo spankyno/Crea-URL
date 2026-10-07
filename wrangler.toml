@@ -21,3 +21,7 @@ database_id = "cbc19ef1-6752-48cd-ac14-c2f986651193"
 # wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 [vars]
 SUPABASE_STORAGE_BUCKET = "html-pages"
+
+# Limpieza de páginas caducadas: cada hora
+[triggers]
+crons = ["0 * * * *"]

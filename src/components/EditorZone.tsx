@@ -39,6 +39,8 @@ interface EditorZoneProps {
   currentUser: UserSession;
   onPublish: () => void;
   isPublishing: boolean;
+  editingSlug?: string | null;
+  onCancelEdit?: () => void;
   onOpenTemplates: () => void;
 }
 
@@ -61,6 +63,8 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
   currentUser,
   onPublish,
   isPublishing,
+  editingSlug,
+  onCancelEdit,
   onOpenTemplates,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -357,8 +361,24 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
         </div>
       )}
 
+      {/* Banner de modo edición */}
+      {editingSlug && (
+        <div className="px-3.5 py-2.5 bg-amber-500/10 border-t border-amber-500/25 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200">
+          <span>
+            Editando <code className="font-mono text-amber-100">/p/{editingSlug}</code>. Al guardar se mantiene la misma URL, la caducidad y la contraseña.
+          </span>
+          <button
+            onClick={onCancelEdit}
+            className="px-2 py-1 rounded border border-amber-500/40 text-amber-100 hover:bg-amber-500/15 transition-colors cursor-pointer"
+          >
+            Dejar de editar (publicar como nueva)
+          </button>
+        </div>
+      )}
+
       {/* Configuration & Options Accordion */}
       <div className="p-3.5 bg-slate-900/60 border-t border-slate-800">
+        {!editingSlug && (
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setShowOptions(!showOptions)}
@@ -371,8 +391,9 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
             </span>
           </button>
         </div>
+        )}
 
-        {showOptions && (
+        {showOptions && !editingSlug && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 pb-3 border-t border-slate-800/80">
             {/* Custom Slug */}
             <div>
@@ -468,7 +489,11 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
             className="w-full sm:flex-1 py-3 px-5 rounded-xl font-semibold text-sm bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 shadow-lg shadow-emerald-500/15 disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center justify-center gap-2 group cursor-pointer"
           >
             <Send className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-            <span>{isPublishing ? 'Publicando página...' : 'Publicar Página Gratis'}</span>
+            <span>
+              {isPublishing
+                ? editingSlug ? 'Guardando cambios...' : 'Publicando página...'
+                : editingSlug ? 'Guardar cambios' : 'Publicar Página Gratis'}
+            </span>
           </button>
 
           <div className="text-[11px] text-slate-400 text-center sm:text-right shrink-0">

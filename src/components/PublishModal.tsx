@@ -17,6 +17,7 @@ import { downloadZipBundle } from '../utils/exporter';
 
 interface PublishModalProps {
   page: PageItem | null;
+  isUpdate?: boolean;
   rawHtml: string;
   onClose: () => void;
   onViewPage: (slug: string) => void;
@@ -24,6 +25,7 @@ interface PublishModalProps {
 
 export const PublishModal: React.FC<PublishModalProps> = ({
   page,
+  isUpdate,
   rawHtml,
   onClose,
   onViewPage,
@@ -83,9 +85,9 @@ export const PublishModal: React.FC<PublishModalProps> = ({
           <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mx-auto mb-3">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold text-white tracking-tight">¡Página Publicada con Éxito!</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">{isUpdate ? '¡Cambios Guardados!' : '¡Página Publicada con Éxito!'}</h2>
           <p className="text-xs text-slate-400 mt-1">
-            Tu archivo estático ya está alojado y accesible globalmente.
+            {isUpdate ? 'Tu página se ha actualizado y mantiene la misma URL.' : 'Tu archivo estático ya está alojado y accesible globalmente.'}
           </p>
         </div>
 

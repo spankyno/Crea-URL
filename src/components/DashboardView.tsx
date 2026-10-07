@@ -15,7 +15,9 @@ import {
   Check, 
   ShieldAlert,
   Sparkles,
-  KeyRound
+  KeyRound,
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import { PageItem, CollectionItem, UserSession } from '../types';
 import { api } from '../services/api';
@@ -25,14 +27,51 @@ import { generateQrDataUrl, downloadQrImage } from '../utils/qr';
 interface DashboardViewProps {
   currentUser: UserSession;
   onViewPage: (slug: string) => void;
+  onEditPage: (slug: string) => void;
   onViewCollection: (slug: string) => void;
   onCreateNewPage: () => void;
   onSwitchToCollections: () => void;
 }
 
+// --- Avisos de caducidad ---
+const WARNING_DAYS = 7; // aviso (ámbar)
+const CRITICAL_DAYS = 3; // urgente (rojo)
+
+type ExpiryStatus = 'expired' | 'ephemeral' | 'critical' | 'warning' | 'ok';
+
+interface ExpiryInfo {
+  status: ExpiryStatus;
+  label: string;
+  msLeft: number;
+}
+
+function getExpiryInfo(p: PageItem): ExpiryInfo {
+  const msLeft = p.expiresAt ? new Date(p.expiresAt).getTime() - Date.now() : Infinity;
+  const minutes = Math.max(0, Math.floor(msLeft / 60000));
+  const hours = Math.floor(msLeft / 3600000);
+  const days = Math.ceil(msLeft / 86400000);
+
+  if (msLeft <= 0) return { status: 'expired', label: 'Expirada', msLeft };
+  if (p.isEphemeral) return { status: 'ephemeral', label: `Efímera · quedan ${minutes} min`, msLeft };
+
+  const label =
+    msLeft < 3600000
+      ? `Caduca en ${minutes} min`
+      : msLeft < 86400000
+        ? `Caduca en ${hours} h`
+        : days === 1
+          ? 'Caduca mañana'
+          : `${days} días`;
+
+  if (msLeft <= CRITICAL_DAYS * 86400000) return { status: 'critical', label, msLeft };
+  if (msLeft <= WARNING_DAYS * 86400000) return { status: 'warning', label, msLeft };
+  return { status: 'ok', label, msLeft };
+}
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   onViewPage,
+  onEditPage,
   onViewCollection,
   onCreateNewPage,
   onSwitchToCollections,
@@ -89,6 +128,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
+  const [isExtendingAll, setIsExtendingAll] = useState(false);
+
+  const handleExtendAll = async (targets: PageItem[]) => {
+    if (targets.length === 0) return;
+    if (!window.confirm(`¿Prorrogar +90 días ${targets.length} página(s)?`)) return;
+    setIsExtendingAll(true);
+    let ok = 0;
+    let failed = 0;
+    for (const t of targets) {
+      try {
+        const updated = await api.extendPage(t.slug, currentUser);
+        setPages((prev) => prev.map((p) => (p.slug === t.slug ? updated : p)));
+        ok++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    setIsExtendingAll(false);
+    alert(
+      failed === 0
+        ? `¡Listo! Se prorrogaron ${ok} página(s).`
+        : `Se prorrogaron ${ok} página(s) y ${failed} fallaron. Inténtalo de nuevo.`
+    );
+  };
+
   const handleDeletePage = async (slug: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar esta página y todo su contenido?')) return;
     try {
@@ -124,6 +188,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setIsUpdatingPassword(false);
     }
   };
+
+  // Páginas que requieren atención (las efímeras se excluyen: están pensadas para desaparecer)
+  const expiredPages = pages.filter((p) => getExpiryInfo(p).status === 'expired');
+  const criticalPages = pages.filter((p) => getExpiryInfo(p).status === 'critical');
+  const warningPages = pages.filter((p) => getExpiryInfo(p).status === 'warning');
+  const needAttention = [...expiredPages, ...criticalPages, ...warningPages];
 
   const totalStorage = pages.reduce((acc, p) => acc + (p.sizeBytes || 0), 0);
   const totalViews = pages.reduce((acc, p) => acc + (p.viewsCount || 0), 0);
@@ -202,6 +272,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Avisos de caducidad */}
+      {!loading && needAttention.length > 0 && (
+        <div
+          className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            expiredPages.length > 0 || criticalPages.length > 0
+              ? 'bg-rose-950/30 border-rose-800/50'
+              : 'bg-amber-950/30 border-amber-800/50'
+          }`}
+          role="alert"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle
+              className={`w-5 h-5 mt-0.5 shrink-0 ${
+                expiredPages.length > 0 || criticalPages.length > 0 ? 'text-rose-400' : 'text-amber-400'
+              }`}
+            />
+            <div className="text-sm">
+              <p className="font-semibold text-slate-100">
+                {needAttention.length === 1
+                  ? '1 página necesita atención'
+                  : `${needAttention.length} páginas necesitan atención`}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {[
+                  expiredPages.length > 0 && `${expiredPages.length} caducada(s) (se eliminarán en breve)`,
+                  criticalPages.length > 0 && `${criticalPages.length} caducan en menos de ${CRITICAL_DAYS} días`,
+                  warningPages.length > 0 && `${warningPages.length} caducan en menos de ${WARNING_DAYS} días`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                . Prorrógalas para mantenerlas online.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleExtendAll(needAttention)}
+            disabled={isExtendingAll}
+            className="shrink-0 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {isExtendingAll ? 'Prorrogando...' : 'Prorrogar todas +90 días'}
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
         <button
@@ -258,10 +372,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
                   {pages.map((p) => {
-                    const isExpired = p.expiresAt && new Date(p.expiresAt) < new Date();
-                    const daysLeft = Math.ceil(
-                      (new Date(p.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                    );
+                    const expiry = getExpiryInfo(p);
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
@@ -296,14 +407,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </td>
 
                         <td className="px-4 py-3.5 tabular-nums">
-                          {isExpired ? (
-                            <span className="text-rose-400 font-semibold">Expirada</span>
-                          ) : p.isEphemeral ? (
-                            <span className="text-purple-400">Efímera (1h)</span>
-                          ) : (
-                            <span className={daysLeft <= 3 ? 'text-amber-400 font-medium' : 'text-slate-300'}>
-                              {daysLeft} día(s)
+                          {expiry.status === 'expired' ? (
+                            <span className="inline-flex items-center gap-1 text-rose-400 font-semibold">
+                              <AlertTriangle className="w-3 h-3" /> Expirada
                             </span>
+                          ) : expiry.status === 'ephemeral' ? (
+                            <span className="text-purple-400">{expiry.label}</span>
+                          ) : expiry.status === 'critical' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 font-medium">
+                              <Clock className="w-3 h-3" /> {expiry.label}
+                            </span>
+                          ) : expiry.status === 'warning' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-medium">
+                              <Clock className="w-3 h-3" /> {expiry.label}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">{expiry.label}</span>
                           )}
                         </td>
 
@@ -325,6 +444,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               title="Ver página"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => onEditPage(p.slug)}
+                              className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition-colors"
+                              title="Editar contenido (misma URL)"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
 
                             <button

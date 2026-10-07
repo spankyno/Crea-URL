@@ -169,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative group">
             <button
               className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg transition-colors whitespace-nowrap"
-              title="Cambiar estado de sesión"
+              title={import.meta.env.DEV ? 'Cambiar estado de sesión (solo desarrollo)' : 'Estado de sesión'}
             >
               <div className={`w-2 h-2 rounded-full ${currentUser.role === 'admin' ? 'bg-amber-400' : currentUser.role === 'user' ? 'bg-sky-400' : 'bg-emerald-500'} animate-pulse`} />
               <span className="max-w-[120px] truncate text-slate-200">{currentUser.name}</span>
@@ -178,7 +178,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </button>
 
-            {/* Menu Dropdown */}
+            {/* Menu Dropdown: selector de roles simulados, solo en desarrollo */}
+            {import.meta.env.DEV && (
             <div className="absolute right-0 mt-1 w-56 p-1.5 bg-[#111827] border border-slate-800 rounded-xl shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 z-50">
               <div className="px-2.5 py-1.5 text-[11px] text-slate-400 border-b border-slate-800/80 mb-1">
                 {IS_CLERK_ENABLED ? 'Roles y Simulación' : 'Modo Demostración / Simulación'}
@@ -211,6 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-[10px] text-slate-500">Ilimitado</span>
               </button>
             </div>
+            )}
           </div>
 
           <button
