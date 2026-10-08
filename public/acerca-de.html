@@ -3,21 +3,229 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acerca de Crea URL — Alojamiento gratuito de páginas HTML</title>
-  <meta name="description" content="Crea URL: pega código o sube un archivo HTML y obtén una URL pública, un código QR y colecciones en segundos. Sin git ni despliegues. Creado por Aitor Sánchez Gutiérrez.">
+  <title>Acerca de Crea URL: alojamiento HTML gratuito y guía de uso</title>
+  <meta name="description" content="Qué es Crea URL, cómo publicar tu HTML en segundos, límites para usuarios anónimos y registrados, stack tecnológico y datos de su autor, Aitor Sánchez.">
   <meta name="author" content="Aitor Sánchez Gutiérrez">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://crea-url.kbo1.workers.dev/acerca-de">
+  <link rel="alternate" hreflang="es" href="https://crea-url.kbo1.workers.dev/acerca-de">
+  <link rel="alternate" hreflang="x-default" href="https://crea-url.kbo1.workers.dev/acerca-de">
+
+  <meta property="og:site_name" content="Crea URL">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://crea-url.kbo1.workers.dev/acerca-de">
+  <meta property="og:title" content="Acerca de Crea URL: alojamiento HTML gratuito y guía de uso">
+  <meta property="og:description" content="Qué es Crea URL, cómo publicar tu HTML en segundos, límites para usuarios anónimos y registrados y stack tecnológico.">
+  <meta property="og:image" content="https://crea-url.kbo1.workers.dev/og-image.png">
+  <meta property="og:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Acerca de Crea URL: alojamiento HTML gratuito y guía de uso">
+  <meta name="twitter:description" content="Qué es Crea URL, cómo publicar tu HTML en segundos y qué límites tiene cada tipo de usuario.">
+  <meta name="twitter:image" content="https://crea-url.kbo1.workers.dev/og-image.png">
+  <meta name="twitter:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública">
+
+  <meta name="theme-color" content="#0b0f17">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preload" as="image" href="/og-image.png" fetchpriority="high">
+
+  <!-- Tema compartido con la aplicación (oscuro por defecto); se aplica antes de pintar -->
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('creaurl_theme') === 'light') {
+          document.documentElement.classList.add('light');
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', '#f8fafc');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "AboutPage",
+      "@id": "https://crea-url.kbo1.workers.dev/acerca-de#pagina",
+      "url": "https://crea-url.kbo1.workers.dev/acerca-de",
+      "name": "Acerca de Crea URL",
+      "description": "Qué es Crea URL, cómo se usa, límites para usuarios anónimos y registrados, stack tecnológico y datos de su autor.",
+      "inLanguage": "es",
+      "isPartOf": {
+        "@id": "https://crea-url.kbo1.workers.dev/#website"
+      },
+      "about": {
+        "@id": "https://crea-url.kbo1.workers.dev/#app"
+      },
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://crea-url.kbo1.workers.dev/og-image.png"
+      },
+      "breadcrumb": {
+        "@id": "https://crea-url.kbo1.workers.dev/acerca-de#migas"
+      },
+      "author": {
+        "@id": "https://crea-url.kbo1.workers.dev/#autor"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://crea-url.kbo1.workers.dev/acerca-de#migas",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Inicio",
+          "item": "https://crea-url.kbo1.workers.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Acerca de",
+          "item": "https://crea-url.kbo1.workers.dev/acerca-de"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://crea-url.kbo1.workers.dev/#website",
+      "url": "https://crea-url.kbo1.workers.dev/",
+      "name": "Crea URL",
+      "inLanguage": "es",
+      "publisher": {
+        "@id": "https://crea-url.kbo1.workers.dev/#autor"
+      }
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://crea-url.kbo1.workers.dev/#app",
+      "name": "Crea URL",
+      "url": "https://crea-url.kbo1.workers.dev/",
+      "description": "Alojamiento gratuito de páginas HTML estáticas con URL pública, código QR y colecciones.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "es",
+      "isAccessibleForFree": true,
+      "image": "https://crea-url.kbo1.workers.dev/og-image.png",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "author": {
+        "@id": "https://crea-url.kbo1.workers.dev/#autor"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://crea-url.kbo1.workers.dev/#autor",
+      "name": "Aitor Sánchez Gutiérrez",
+      "url": "https://aitorsanchez.pages.dev",
+      "sameAs": [
+        "https://aitorsanchez.pages.dev",
+        "https://aitorhub.vercel.app"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "url": "https://aitorsanchez.pages.dev/contacto",
+        "availableLanguage": "es"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://crea-url.kbo1.workers.dev/acerca-de#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es Crea URL?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Una herramienta para poner un archivo HTML en internet en segundos: pegas el código o subes el archivo, publicas y obtienes un enlace compartible y un código QR."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Necesito registrarme?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No para publicar. Con cuenta gratuita el tamaño máximo sube de 1 MB a 10 MB, las páginas duran 3 meses en lugar de 15 días y puedes protegerlas con contraseña."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto tiempo permanece activa una página?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "15 días si publicas de forma anónima y 3 meses con cuenta, con opción de prorrogar +90 días desde el panel. En modo efímero, la página desaparece pasada una hora."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Es seguro el contenido que publico?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Las páginas se sirven con una política de sandbox, de manera que no pueden acceder a la aplicación ni a datos de otros usuarios. Aun así, no publiques información sensible en páginas públicas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué son las colecciones?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Una colección agrupa varias de tus páginas bajo un único enlace /c/nombre, con su propio título y descripción. Cada página sigue siendo independiente."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo publicar desde un script?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. La API acepta una petición POST /api/pages con el HTML en el cuerpo y devuelve la URL pública."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué ocurre cuando caduca una página?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Se elimina de forma automática, tanto el registro como el archivo almacenado. Puedes ampliar la caducidad antes de que ocurra."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+
+  <!-- Seguimiento (Aitor's Hub Dashboard) -->
+  <script src="https://aitors-hub-dashboard.asanchezgu.workers.dev/tracker.js" data-app="crea-url" data-key="ak_53d35ba2f3234730ad06768268816a0a" async></script>
   <style>
     :root {
-      --bg: #0b1120; --panel: #111a2e; --panel2: #0f172a; --border: #1e293b;
+      color-scheme: dark;
+      --bg: #0b0f17; --panel: #111827; --panel2: #0d121c; --border: #1e293b;
       --text: #cbd5e1; --muted: #94a3b8; --title: #f8fafc; --accent: #34d399; --accent-ink: #052e16;
     }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f8fafc; --panel: #ffffff; --panel2: #f1f5f9; --border: #e2e8f0;
-        --text: #334155; --muted: #64748b; --title: #0f172a; --accent: #059669; --accent-ink: #ffffff;
-      }
+    html.light {
+      color-scheme: light;
+      --bg: #f8fafc; --panel: #ffffff; --panel2: #f1f5f9; --border: #e2e8f0;
+      --text: #334155; --muted: #64748b; --title: #0f172a; --accent: #047857; --accent-ink: #ffffff;
     }
+    .skip { position: absolute; left: -9999px; top: 8px; background: var(--accent); color: var(--accent-ink); padding: 8px 14px; border-radius: 8px; z-index: 10; font-weight: 600; }
+    .skip:focus { left: 8px; }
+    .head-right { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .theme-toggle { margin-left: 12px; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; width: 34px; height: 34px; display: inline-grid; place-items: center; cursor: pointer; }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+    .theme-toggle .sun { display: none; }
+    html.light .theme-toggle .sun { display: block; }
+    html.light .theme-toggle .moon { display: none; }
+    .shot { margin: 28px 0 0; }
+    .shot img { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); }
+    .shot figcaption { margin-top: 8px; font-size: 13px; color: var(--muted); text-align: center; }
+    .foot-links { margin: 8px 0 0; display: flex; gap: 6px 18px; justify-content: center; flex-wrap: wrap; }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -66,10 +274,12 @@
   </style>
 </head>
 <body>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
   <header class="top">
     <div class="wrap">
       <a class="brand" href="/">Crea <span>URL</span></a>
-      <nav>
+      <div class="head-right">
+      <nav aria-label="Secciones de la página">
         <a href="#como-se-usa">Cómo se usa</a>
         <a href="#caracteristicas">Características</a>
         <a href="#limites">Anónimo vs. registrado</a>
@@ -77,20 +287,29 @@
         <a href="#faq">Preguntas</a>
         <a href="#autor">Autor</a>
       </nav>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar a modo claro" title="Cambiar a modo claro">
+        <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      </div>
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="wrap" id="contenido">
     <div class="hero">
       <span class="badge">Alojamiento HTML gratuito</span>
       <h1>Pega tu HTML. Obtén una URL.</h1>
       <p class="lead">Crea URL aloja archivos HTML estáticos: pega el código o suelta un archivo, publica y recibe al instante un enlace limpio para compartir y un código QR. Sin git, sin repositorio y sin pipeline de despliegue.</p>
       <a class="btn" href="/">Publicar una página</a>
       <a class="btn ghost" href="#stack">Ver el stack</a>
+      <figure class="shot">
+        <img src="/og-image.png" alt="Crea URL: alojamiento gratuito de páginas HTML con URL pública, código QR y colecciones" decoding="async" fetchpriority="high">
+        <figcaption>Crea URL, alojamiento gratuito de páginas HTML con URL pública.</figcaption>
+      </figure>
     </div>
 
-    <section id="como-se-usa">
-      <h2>Cómo se usa</h2>
+    <section id="como-se-usa" aria-labelledby="como-se-usa-titulo">
+      <h2 id="como-se-usa-titulo">Cómo se usa</h2>
       <p class="sub">De HTML a URL en unos segundos. No necesitas cuenta para empezar.</p>
       <ol class="steps">
         <li><h3>Escribe, pega o sube tu HTML</h3><p>En el editor pega el código completo de tu página, o usa una de las <strong>plantillas</strong> del menú superior como punto de partida. Escribe un título para identificarla en tu panel. El indicador de tamaño muestra cuánto ocupa frente al límite de tu cuenta.</p></li>
@@ -107,8 +326,8 @@
   -d '{"title":"Mi página","html":"&lt;h1&gt;Hola&lt;/h1&gt;"}'</code></pre>
     </section>
 
-    <section id="caracteristicas">
-      <h2>Qué puedes hacer</h2>
+    <section id="caracteristicas" aria-labelledby="caracteristicas-titulo">
+      <h2 id="caracteristicas-titulo">Qué puedes hacer</h2>
       <p class="sub">Lo justo para compartir una página, sin complicaciones.</p>
       <div class="grid">
         <div class="card"><h3>URL limpia al instante</h3><p>Slug aleatorio o personalizado (3–40 caracteres) para que el enlace sea fácil de recordar.</p></div>
@@ -126,8 +345,8 @@
       </div>
     </section>
 
-    <section id="limites">
-      <h2>Usuarios anónimos y registrados</h2>
+    <section id="limites" aria-labelledby="limites-titulo">
+      <h2 id="limites-titulo">Usuarios anónimos y registrados</h2>
       <p class="sub">Puedes publicar sin cuenta. Registrarte es gratis y amplía los límites.</p>
       <div class="tablewrap">
         <table>
@@ -151,8 +370,8 @@
       <p class="sub" style="margin-top:14px">Las páginas caducadas se eliminan automáticamente, tanto el registro como el archivo almacenado.</p>
     </section>
 
-    <section id="comparativa">
-      <h2>Crea URL frente a otras opciones</h2>
+    <section id="comparativa" aria-labelledby="comparativa-titulo">
+      <h2 id="comparativa-titulo">Crea URL frente a otras opciones</h2>
       <p class="sub">GitHub Pages, Netlify y Vercel son excelentes para aplicaciones en producción. Para compartir un único archivo HTML, hay un camino más corto.</p>
       <div class="tablewrap">
         <table>
@@ -169,8 +388,8 @@
       </div>
     </section>
 
-    <section id="stack">
-      <h2>Stack tecnológico</h2>
+    <section id="stack" aria-labelledby="stack-titulo">
+      <h2 id="stack-titulo">Stack tecnológico</h2>
       <p class="sub">Una aplicación en el borde (edge): interfaz estática, API en un Worker y almacenamiento separado para los metadatos y el HTML.</p>
       <div class="tablewrap">
         <table>
@@ -192,8 +411,8 @@
                                   └─► Supabase Storage (HTML)</code></pre>
     </section>
 
-    <section id="faq">
-      <h2>Preguntas frecuentes</h2>
+    <section id="faq" aria-labelledby="faq-titulo">
+      <h2 id="faq-titulo">Preguntas frecuentes</h2>
       <p class="sub">Lo esencial sobre cómo funciona Crea URL.</p>
       <details><summary>¿Qué es Crea URL?</summary><p>Una herramienta para poner un archivo HTML en internet en segundos: pegas el código o subes el archivo, publicas y obtienes un enlace compartible y un código QR.</p></details>
       <details><summary>¿Necesito registrarme?</summary><p>No para publicar. Con cuenta gratuita el tamaño máximo sube de 1 MB a 10 MB, las páginas duran 3 meses en lugar de 15 días y puedes protegerlas con contraseña.</p></details>
@@ -204,8 +423,8 @@
       <details><summary>¿Qué ocurre cuando caduca una página?</summary><p>Se elimina de forma automática, tanto el registro como el archivo almacenado. Puedes ampliar la caducidad antes de que ocurra.</p></details>
     </section>
 
-    <section id="autor">
-      <h2>Autor y enlaces</h2>
+    <section id="autor" aria-labelledby="autor-titulo">
+      <h2 id="autor-titulo">Autor y enlaces</h2>
       <p class="sub">Crea URL está desarrollado por <strong style="color:var(--title)">Aitor Sánchez Gutiérrez</strong>, desarrollador de software y creador de herramientas web.</p>
       <div class="links">
         <a class="card" href="https://aitorsanchez.pages.dev" target="_blank" rel="noopener noreferrer"><h3>Blog personal</h3><p>Artículos y proyectos.</p><span class="url">aitorsanchez.pages.dev</span></a>
@@ -218,8 +437,35 @@
   <footer>
     <div class="wrap">
       <p style="margin:0 0 6px">Crea URL © 2026 · Autor: Aitor Sánchez Gutiérrez</p>
-      <p style="margin:0"><a href="/">Volver a Crea URL</a></p>
+      <p class="foot-links">
+        <a href="/">Volver a Crea URL</a>
+        <a href="https://aitorsanchez.pages.dev" target="_blank" rel="noopener noreferrer">Blog</a>
+        <a href="https://aitorhub.vercel.app" target="_blank" rel="noopener noreferrer">Aitor Hub</a>
+        <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">Contacto</a>
+      </p>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('theme-toggle');
+      var root = document.documentElement;
+      function label() {
+        var light = root.classList.contains('light');
+        var t = light ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
+        btn.setAttribute('aria-label', t);
+        btn.setAttribute('title', t);
+      }
+      label();
+      btn.addEventListener('click', function () {
+        var light = root.classList.toggle('light');
+        root.classList.toggle('dark', !light);
+        try { localStorage.setItem('creaurl_theme', light ? 'light' : 'dark'); } catch (e) {}
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', light ? '#f8fafc' : '#0b0f17');
+        label();
+      });
+    })();
+  </script>
 </body>
 </html>
