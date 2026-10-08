@@ -162,7 +162,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0d121c] rounded-xl border border-slate-800/90 shadow-2xl overflow-hidden">
+    <div className="flex flex-col h-full bg-app-alt rounded-xl border border-slate-800/90 shadow-2xl overflow-hidden">
       {/* Top Editor Action Bar */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs">
         <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Título de la página (ej: Mi Web Estática)..."
-            className="bg-slate-950/80 border border-slate-800 focus:border-emerald-500/80 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none w-52 sm:w-64 transition-colors"
+            className="bg-slate-950/80 border border-slate-800 focus:border-emerald-500/80 rounded-lg px-2.5 py-1 text-xs text-strong placeholder-slate-500 outline-none w-52 sm:w-64 transition-colors"
           />
           {lastSavedTime && (
             <span className="hidden lg:inline text-[11px] text-slate-500 font-mono">
@@ -185,7 +185,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
           <button
             onClick={handleMinify}
             disabled={!html}
-            className="px-2 py-1 text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors flex items-center gap-1 text-[11px] disabled:opacity-40 disabled:pointer-events-none"
+            className="px-2 py-1 text-slate-300 hover:text-strong bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors flex items-center gap-1 text-[11px] disabled:opacity-40 disabled:pointer-events-none"
             title="Minificar HTML eliminando comentarios y espacios superfluos"
           >
             <Minimize2 className="w-3 h-3 text-sky-400" />
@@ -195,7 +195,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
           <button
             onClick={() => downloadHtmlFile(html, `${customSlug || 'pagina'}.html`)}
             disabled={!html}
-            className="p-1.5 text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="p-1.5 text-slate-300 hover:text-strong bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
             title="Descargar archivo .html"
           >
             <FileDown className="w-3.5 h-3.5" />
@@ -204,7 +204,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
           <button
             onClick={() => downloadZipBundle({ title, slug: customSlug }, html)}
             disabled={!html}
-            className="p-1.5 text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="p-1.5 text-slate-300 hover:text-strong bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
             title="Exportar como .ZIP con README y metadatos"
           >
             <Archive className="w-3.5 h-3.5 text-amber-400" />
@@ -242,7 +242,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={`relative flex-1 flex flex-col transition-colors ${
-          isDragging ? 'bg-emerald-950/20 ring-2 ring-emerald-500/50' : 'bg-[#0b0f17]'
+          isDragging ? 'bg-emerald-950/20 ring-2 ring-emerald-500/50' : 'bg-app'
         }`}
       >
         <input
@@ -333,7 +333,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
 
       {/* Validation Analysis Drawer */}
       {showValidationDetails && html && (
-        <div className="bg-[#111827] border-t border-slate-800 p-3.5 text-xs max-h-48 overflow-y-auto space-y-2">
+        <div className="bg-app-card border-t border-slate-800 p-3.5 text-xs max-h-48 overflow-y-auto space-y-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-2 border-b border-slate-800 font-mono text-[11px] text-slate-400">
             <div>Scripts: <span className="text-slate-200">{validation.tagStats.scripts}</span></div>
             <div>Estilos: <span className="text-slate-200">{validation.tagStats.styles}</span></div>
@@ -382,7 +382,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setShowOptions(!showOptions)}
-            className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5"
+            className="text-xs font-semibold text-slate-300 hover:text-strong flex items-center gap-1.5"
           >
             <Layers className="w-3.5 h-3.5 text-emerald-400" />
             <span>Configuración de URL y Seguridad</span>
@@ -407,7 +407,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
                   value={customSlug}
                   onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))}
                   placeholder="mi-proyecto-web"
-                  className="bg-transparent border-0 outline-none w-full text-white font-mono text-xs ml-1"
+                  className="bg-transparent border-0 outline-none w-full text-strong font-mono text-xs ml-1"
                 />
               </div>
               <span className="text-[10px] text-slate-500 mt-0.5 block">
@@ -435,7 +435,7 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
                     ? 'Inicia sesión para proteger con clave'
                     : 'Introduce contraseña de acceso...'
                 }
-                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-1 text-xs text-strong outline-none"
               />
             </div>
 

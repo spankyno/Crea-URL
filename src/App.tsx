@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { lazyWithReload } from './utils/lazyWithReload';
+import { STARTER_HTML } from './constants/starterHtml';
 import { Navbar } from './components/Navbar';
 import { EditorZone } from './components/EditorZone';
 import { PreviewZone } from './components/PreviewZone';
-import { PublishModal } from './components/PublishModal';
-import { DashboardView } from './components/DashboardView';
-import { CollectionsView } from './components/CollectionsView';
-import { AdminView } from './components/AdminView';
-import { PublicPageView } from './components/PublicPageView';
-import { TemplatesModal } from './components/TemplatesModal';
 import { Footer } from './components/Footer';
+
+// Pantallas secundarias: se descargan solo cuando se necesitan (reduce el paquete inicial)
+const PublishModal = lazyWithReload(() => import('./components/PublishModal').then((m) => ({ default: m.PublishModal })));
+const DashboardView = lazyWithReload(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
+const CollectionsView = lazyWithReload(() => import('./components/CollectionsView').then((m) => ({ default: m.CollectionsView })));
+const AdminView = lazyWithReload(() => import('./components/AdminView').then((m) => ({ default: m.AdminView })));
+const PublicPageView = lazyWithReload(() => import('./components/PublicPageView').then((m) => ({ default: m.PublicPageView })));
+const TemplatesModal = lazyWithReload(() => import('./components/TemplatesModal').then((m) => ({ default: m.TemplatesModal })));
+
+const LoadingFallback: React.FC<{ fullScreen?: boolean }> = ({ fullScreen }) => (
+  <div
+    className={`flex items-center justify-center text-xs text-slate-400 ${fullScreen ? 'min-h-screen bg-app' : 'py-16'}`}
+    role="status"
+  >
+    Cargando…
+  </div>
+);
 import { UserSession, PageItem, CollectionItem, StarterTemplate } from './types';
 import { api } from './services/api';
 import { FileCode, Eye } from 'lucide-react';
@@ -62,90 +75,7 @@ function ClerkUserSync({ onUserChange }: { onUserChange: (user: UserSession) => 
   return null;
 }
 
-const DEFAULT_STARTER_HTML = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Nueva Página en Crea URL</title>
-  <style>
-    :root {
-      --bg: #090d16;
-      --card: #131b2e;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: #10b981;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 24px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 520px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-    }
-    .badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--accent);
-      background: rgba(16,185,129,0.1);
-      border: 1px solid rgba(16,185,129,0.25);
-      padding: 4px 12px;
-      border-radius: 999px;
-      margin-bottom: 20px;
-    }
-    h1 {
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 12px;
-    }
-    p {
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 28px;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      padding: 12px 24px;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #052e16;
-      font-weight: 600;
-      font-size: 14px;
-      text-decoration: none;
-      transition: opacity 0.2s;
-    }
-    .btn:hover {
-      opacity: 0.9;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <span class="badge">Alojamiento HTML Gratuito</span>
-    <h1>¡Hola Mundo! Tu Página Web</h1>
-    <p>Esta es tu página estática lista para ser publicada con URL limpia, código QR y sandbox seguro.</p>
-    <a href="${typeof window !== 'undefined' ? window.location.origin : ''}/acerca-de" class="btn" target="_blank" rel="noopener">Aprender Más</a>
-  </div>
-</body>
-</html>`;
+
 
 export default function App() {
   // Routing state
@@ -193,7 +123,7 @@ export default function App() {
         );
       }
     } catch (e) {}
-    return DEFAULT_STARTER_HTML;
+    return STARTER_HTML;
   });
 
   const [title, setTitle] = useState<string>(() => {
@@ -215,7 +145,24 @@ export default function App() {
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState<boolean>(false);
   const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
-  const [darkMode, setDarkMode] = useState<boolean>(true);
+  // Tema: oscuro por defecto; la preferencia se guarda y se comparte con la página «Acerca de»
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('creaurl_theme') !== 'light';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', darkMode);
+    root.classList.toggle('light', !darkMode);
+    try {
+      localStorage.setItem('creaurl_theme', darkMode ? 'dark' : 'light');
+    } catch (e) {}
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkMode ? '#0b0f17' : '#f8fafc');
+  }, [darkMode]);
 
   // Sync user state to localStorage
   useEffect(() => {
@@ -279,7 +226,7 @@ export default function App() {
 
   const handleNewPage = () => {
     setEditingSlug(null);
-    setHtml(DEFAULT_STARTER_HTML);
+    setHtml(STARTER_HTML);
     setTitle('');
     setDescription('');
     setCustomSlug('');
@@ -350,18 +297,20 @@ export default function App() {
   // If viewing a public page `/p/:slug`
   if (activeSlug) {
     return (
-      <PublicPageView
-        slug={activeSlug}
-        onBack={() => {
-          setActiveSlug(null);
-          window.history.pushState({}, '', '/');
-        }}
-      />
+      <Suspense fallback={<LoadingFallback fullScreen />}>
+        <PublicPageView
+          slug={activeSlug}
+          onBack={() => {
+            setActiveSlug(null);
+            window.history.pushState({}, '', '/');
+          }}
+        />
+      </Suspense>
     );
   }
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors ${darkMode ? 'bg-[#0b0f17] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`min-h-screen flex flex-col font-sans transition-colors bg-app text-slate-100`}>
       {IS_CLERK_ENABLED && <ClerkUserSync onUserChange={setCurrentUser} />}
       {/* Top Navbar */}
       <Navbar
@@ -377,6 +326,7 @@ export default function App() {
 
       {/* Main Content Viewports */}
       <main className="flex-1 flex flex-col">
+        <h1 className="sr-only">Crea URL: publica páginas HTML gratis con URL pública</h1>
         {currentTab === 'editor' && (
           <div className="flex-1 flex flex-col p-3 sm:p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
             {/* Mobile View Toggle Segmented Control */}
@@ -443,6 +393,7 @@ export default function App() {
           </div>
         )}
 
+        <Suspense fallback={<LoadingFallback />}>
         {currentTab === 'dashboard' && (
           <DashboardView
             currentUser={currentUser}
@@ -472,6 +423,7 @@ export default function App() {
             onViewPage={handleViewPage}
           />
         )}
+        </Suspense>
       </main>
 
       {/* Footer */}
@@ -479,6 +431,7 @@ export default function App() {
 
       {/* Publish Success Modal */}
       {publishedPage && (
+        <Suspense fallback={null}>
         <PublishModal
           page={publishedPage}
           isUpdate={publishWasUpdate}
@@ -489,9 +442,12 @@ export default function App() {
             handleViewPage(slug);
           }}
         />
+        </Suspense>
       )}
 
       {/* Starter Templates Modal */}
+      {showTemplatesModal && (
+      <Suspense fallback={null}>
       <TemplatesModal
         isOpen={showTemplatesModal}
         onClose={() => setShowTemplatesModal(false)}
@@ -501,6 +457,8 @@ export default function App() {
           setDescription(tpl.description);
         }}
       />
+      </Suspense>
+      )}
     </div>
   );
 }

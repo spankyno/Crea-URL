@@ -3,20 +3,152 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Crea URL - Alojamiento y Publicación de Páginas HTML Estáticas</title>
-    <meta name="description" content="Sube, previsualiza y publica páginas HTML estáticas al instante con URLs limpias, sandbox seguro, colecciones, códigos QR y protección por contraseña." />
-    <meta property="og:title" content="Crea URL - Alojamiento y Publicación de Páginas HTML Estáticas" />
-    <meta property="og:description" content="Sube, previsualiza y publica páginas HTML estáticas al instante con URLs limpias, sandbox seguro, colecciones, códigos QR y protección por contraseña." />
+
+    <!-- Tema (oscuro por defecto): se aplica antes de pintar para evitar el parpadeo. Preferencia compartida con /acerca-de -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('creaurl_theme') === 'light') {
+            var r = document.documentElement;
+            r.classList.remove('dark');
+            r.classList.add('light');
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#f8fafc');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Título y descripción -->
+    <title>Crea URL: publica páginas HTML gratis con URL pública</title>
+    <meta
+      name="description"
+      content="Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña. Gratis, sin git ni despliegues."
+    />
+    <meta name="author" content="Aitor Sánchez Gutiérrez" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://crea-url.kbo1.workers.dev/" />
+    <link rel="alternate" hreflang="es" href="https://crea-url.kbo1.workers.dev/" />
+    <link rel="alternate" hreflang="x-default" href="https://crea-url.kbo1.workers.dev/" />
+
+    <!-- Propiedad del sitio (Google Search Console) -->
+    <meta name="google-site-verification" content="9ZHO-guhbhS_RWHdRXOWS6fDLPbIWQB_HFDQbS6noOo" />
+
+    <!-- Open Graph (Facebook, LinkedIn, WhatsApp, Telegram...) -->
+    <meta property="og:site_name" content="Crea URL" />
+    <meta property="og:locale" content="es_ES" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://crea-url.kbo1.workers.dev/" />
+    <meta property="og:title" content="Crea URL: publica páginas HTML gratis con URL pública" />
+    <meta
+      property="og:description"
+      content="Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña. Gratis, sin git ni despliegues."
+    />
+    <meta property="og:image" content="https://crea-url.kbo1.workers.dev/og-image.png" />
+    <meta property="og:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="twitter:title" content="Crea URL: publica páginas HTML gratis con URL pública" />
+    <meta
+      name="twitter:description"
+      content="Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña."
+    />
+    <meta name="twitter:image" content="https://crea-url.kbo1.workers.dev/og-image.png" />
+    <meta name="twitter:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública" />
+
+    <!-- Iconos y PWA -->
+    <meta name="theme-color" content="#0b0f17" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Datos estructurados (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://crea-url.kbo1.workers.dev/#website",
+            "url": "https://crea-url.kbo1.workers.dev/",
+            "name": "Crea URL",
+            "description": "Alojamiento gratuito de páginas HTML estáticas con URL pública, código QR y colecciones.",
+            "inLanguage": "es",
+            "publisher": { "@id": "https://crea-url.kbo1.workers.dev/#autor" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://crea-url.kbo1.workers.dev/#app",
+            "name": "Crea URL",
+            "url": "https://crea-url.kbo1.workers.dev/",
+            "description": "Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña.",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Web",
+            "browserRequirements": "Requiere un navegador moderno con JavaScript",
+            "inLanguage": "es",
+            "isAccessibleForFree": true,
+            "image": "https://crea-url.kbo1.workers.dev/og-image.png",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+            "featureList": [
+              "Publicación de HTML con URL pública",
+              "Código QR descargable",
+              "Colecciones de páginas",
+              "Protección con contraseña",
+              "Páginas efímeras",
+              "Edición manteniendo la URL",
+              "Estadísticas de visitas",
+              "Exportación en ZIP"
+            ],
+            "author": { "@id": "https://crea-url.kbo1.workers.dev/#autor" },
+            "isPartOf": { "@id": "https://crea-url.kbo1.workers.dev/#website" }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://crea-url.kbo1.workers.dev/#autor",
+            "name": "Aitor Sánchez Gutiérrez",
+            "url": "https://aitorsanchez.pages.dev",
+            "sameAs": ["https://aitorsanchez.pages.dev", "https://aitorhub.vercel.app"],
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "contactType": "customer support",
+              "url": "https://aitorsanchez.pages.dev/contacto",
+              "availableLanguage": "es"
+            }
+          }
+        ]
+      }
+    </script>
+
+    <!-- Seguimiento (Aitor's Hub Dashboard) -->
+    <script
+      src="https://aitors-hub-dashboard.asanchezgu.workers.dev/tracker.js"
+      data-app="crea-url"
+      data-key="ak_53d35ba2f3234730ad06768268816a0a"
+      async
+    ></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
-  <body class="bg-[#0b0f17] text-slate-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 min-h-screen">
+  <body class="bg-app text-slate-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 min-h-screen">
     <div id="root"></div>
+    <noscript>
+      <main style="max-width:640px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;line-height:1.6;color:#cbd5e1">
+        <h1 style="color:#f8fafc">Crea URL: publica páginas HTML gratis con URL pública</h1>
+        <p>
+          Crea URL aloja páginas HTML estáticas: pega o sube tu código y obtén al instante una URL pública, un código QR, colecciones y
+          protección con contraseña. Esta aplicación necesita JavaScript para funcionar.
+        </p>
+        <p>
+          <a href="/acerca-de" style="color:#34d399">Más información sobre Crea URL</a> · Creado por
+          <a href="https://aitorsanchez.pages.dev" style="color:#34d399">Aitor Sánchez Gutiérrez</a>
+        </p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

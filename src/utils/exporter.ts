@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { PageItem } from '../types';
 
 export function downloadHtmlFile(html: string, filename = 'index.html') {
@@ -14,6 +13,8 @@ export function downloadHtmlFile(html: string, filename = 'index.html') {
 }
 
 export async function downloadZipBundle(page: Partial<PageItem>, html: string) {
+  // jszip (~95 kB) solo se descarga cuando el usuario exporta un ZIP
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const slug = page.slug || 'pagina';
 
@@ -26,7 +27,7 @@ export async function downloadZipBundle(page: Partial<PageItem>, html: string) {
     description: page.description || '',
     slug: page.slug,
     exportedAt: new Date().toISOString(),
-    generator: 'Crea URL (host-html style)',
+    generator: 'Crea URL',
     version: '1.0.0',
   };
   zip.file('metadata.json', JSON.stringify(meta, null, 2));

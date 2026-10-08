@@ -134,18 +134,18 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-in fade-in duration-200">
         <button
           onClick={() => onSelectCollection(null)}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-strong transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Volver a todas las colecciones</span>
         </button>
 
-        <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <FolderKanban className="w-5 h-5 text-emerald-400" />
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-strong tracking-tight">
                   {collection.title}
                 </h1>
               </div>
@@ -164,14 +164,14 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
         {/* Pages Grid in Collection */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pages.length === 0 ? (
-            <div className="col-span-full p-12 text-center text-slate-400 bg-[#0f172a] border border-slate-800 rounded-xl">
+            <div className="col-span-full p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-xl">
               <p className="text-sm">Esta colección aún no tiene páginas asignadas.</p>
             </div>
           ) : (
             pages.map((page) => (
               <div
                 key={page.id}
-                className="bg-[#0f172a] border border-slate-800 rounded-xl overflow-hidden shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between"
+                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between"
               >
                 {/* Miniature Preview Frame */}
                 <div className="h-44 bg-slate-950 relative overflow-hidden border-b border-slate-800 group">
@@ -215,7 +215,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-in fade-in duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-strong tracking-tight flex items-center gap-2">
             <span>Colecciones de Páginas</span>
             <span className="text-xs font-mono font-normal px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               URL: /c/{'{slug}'}
@@ -239,9 +239,9 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       {isCreating && (
         <form
           onSubmit={handleCreateCollection}
-          className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4"
+          className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4"
         >
-          <h2 className="text-base font-bold text-white">Crear Nueva Colección</h2>
+          <h2 className="text-base font-bold text-strong">Crear Nueva Colección</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Título de la Colección</label>
@@ -251,7 +251,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Ej: Mis Diseños de E-commerce..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-strong outline-none focus:border-emerald-500"
               />
             </div>
 
@@ -264,7 +264,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                   value={newSlug}
                   onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))}
                   placeholder="mis-proyectos"
-                  className="bg-transparent border-0 outline-none w-full text-white font-mono ml-1"
+                  className="bg-transparent border-0 outline-none w-full text-strong font-mono ml-1"
                 />
               </div>
             </div>
@@ -276,7 +276,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="Describe el propósito o contenido de este grupo de páginas..."
                 rows={2}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-emerald-500 resize-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-strong outline-none focus:border-emerald-500 resize-none"
               />
             </div>
 
@@ -318,7 +318,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
             <button
               type="button"
               onClick={() => setIsCreating(false)}
-              className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+              className="px-3 py-1.5 text-xs text-slate-400 hover:text-strong"
             >
               Cancelar
             </button>
@@ -335,7 +335,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       {/* Collections Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {collections.length === 0 ? (
-          <div className="col-span-full p-12 text-center text-slate-400 bg-[#0f172a] border border-slate-800 rounded-xl">
+          <div className="col-span-full p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-xl">
             <FolderKanban className="w-10 h-10 mx-auto mb-2 text-slate-600" />
             <h3 className="text-sm font-semibold text-slate-200 mb-1">Sin colecciones todavía</h3>
             <p className="text-xs text-slate-500 mb-4">
@@ -346,7 +346,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
           collections.map((col) => (
             <div
               key={col.id}
-              className="bg-[#0f172a] border border-slate-800 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-all shadow-md group"
+              className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-all shadow-md group"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -360,7 +360,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                   </button>
                 </div>
 
-                <h3 className="font-bold text-white text-base mb-1 group-hover:text-emerald-300 transition-colors">
+                <h3 className="font-bold text-strong text-base mb-1 group-hover:text-emerald-300 transition-colors">
                   {col.title}
                 </h3>
                 <p className="text-xs text-slate-400 line-clamp-2 mb-4">
@@ -374,7 +374,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 </span>
                 <button
                   onClick={() => onSelectCollection(col.slug)}
-                  className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-strong rounded-lg transition-colors flex items-center gap-1.5"
                 >
                   <span>Ver Colección</span>
                   <ExternalLink className="w-3 h-3" />

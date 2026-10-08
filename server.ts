@@ -843,7 +843,7 @@ app.get('/api/templates', (_req: Request, res: Response) => {
     <p>Aprende a integrar el servicio mediante llamadas HTTP RESTful estándar.</p>
     <h2>1. Autenticación</h2>
     <p>Incluye tu clave en la cabecera <code>Authorization: Bearer TU_API_KEY</code>.</p>
-    <pre>curl -X POST https://host-html.com/api/pages \\
+    <pre>curl -X POST https://crea-url.kbo1.workers.dev/api/pages \\
   -H "Authorization: Bearer sk_live_12345" \\
   -H "Content-Type: application/json" \\
   -d '{"html": "&lt;h1&gt;Hola Mundo&lt;/h1&gt;", "title": "Mi Primera Web"}'</pre>

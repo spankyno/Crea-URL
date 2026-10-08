@@ -88,6 +88,18 @@ Debe mostrar `authConfigured: true`, tu `userId` y `role` (`admin` si tu ID est�
 - **Propiedad:** solo el dueño (o un admin) puede editar, prorrogar, cambiar la contraseña o borrar una página o colección.
 - **Contraseñas de página:** PBKDF2-SHA256 con sal aleatoria. Los hashes antiguos se migran solos al primer acceso correcto. La clave nunca viaja por la URL.
 - **Límites de peticiones** (tabla `rate_limits` en D1, se crea sola): publicar 10/h (anónimo, por IP) y 60/h (con cuenta); editar 30/h y 120/h; colecciones 20/h; 10 contraseñas erróneas por IP y página cada 15 min.
+- **Estadísticas:** cada visita (excepto robots y vistas previas de redes) suma al total y al detalle diario UTC de la tabla `page_views_daily` (se crea sola; se conserva 400 días y se borra al eliminar o caducar la página). Solo el dueño o un admin puede ver `GET /api/pages/:slug/stats`.
 - **Tamaño y caducidad:** anónimo 1 MB / 15 días; registrado 10 MB / 90 días. Cron horario (`[triggers]` en `wrangler.toml`) que elimina páginas caducadas (archivo en Supabase y registro en D1).
 
 > `server.ts` (servidor local de desarrollo) sigue confiando en cabeceras: no lo uses en producción.
+
+---
+
+## SEO, tema visual y seguimiento
+
+- **Imagen para compartir:** `public/og-image.png` (no está incluida en este repositorio de ejemplo: súbela tú). La usan las etiquetas `og:image` / `twitter:image`, la página `/acerca-de` y las vistas previas de `/p/...` y `/c/...`. Tamaño recomendado: 1200×630 px.
+- **Dominio:** las URLs absolutas (canonical, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt`) apuntan a `https://crea-url.kbo1.workers.dev`. Si cambias de dominio, sustitúyelo en `index.html`, `public/acerca-de.html`, `public/sitemap.xml` y `public/robots.txt`.
+- **Indexación:** solo se indexan `/` y `/acerca-de`. Las páginas de usuarios (`/p/`, `/c/`, `/raw/`) y la API llevan `noindex` (meta robots o cabecera `X-Robots-Tag`).
+- **Search Console:** la etiqueta `google-site-verification` está en `index.html`. Envía `https://crea-url.kbo1.workers.dev/sitemap.xml` desde Search Console.
+- **Seguimiento:** el script de Aitor's Hub Dashboard está en `index.html` y `public/acerca-de.html`. No se inyecta en el contenido publicado por los usuarios.
+- **Tema:** oscuro por defecto; la preferencia se guarda en `localStorage` (`creaurl_theme`) y la comparten la aplicación y `/acerca-de`. En `src/index.css` están los tokens (`bg-app`, `text-strong`...) y la inversión de paleta del modo claro.

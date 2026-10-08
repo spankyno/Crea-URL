@@ -466,6 +466,7 @@ async function purgeExpired(env: Env): Promise<{ purged: number; failed: number;
     await env.DB.prepare(`DELETE FROM pages WHERE slug IN (${placeholders})`)
       .bind(...deletedSlugs)
       .run();
+    await deleteViewStats(env, deletedSlugs);
   }
 
   const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM pages WHERE expires_at < ?').bind(nowIso).first<any>();
@@ -493,7 +494,7 @@ function shortText(v: unknown, max: number): string {
 
 function injectShareMeta(
   html: string,
-  meta: { title: string; description: string; url: string; type: string }
+  meta: { title: string; description: string; url: string; type: string; origin: string }
 ): string {
   const t = escapeHtml(meta.title);
   const d = escapeHtml(meta.description);
@@ -501,16 +502,25 @@ function injectShareMeta(
   let out = html
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${t}</title>`)
     .replace(/<meta\s+name="description"[^>]*>/i, '')
-    .replace(/<meta\s+property="og:(?:title|description|type|url)"[^>]*>/gi, '')
-    .replace(/<meta\s+name="twitter:(?:card|title|description)"[^>]*>/gi, '');
+    .replace(/<meta\s+name="robots"[^>]*>/gi, '')
+    .replace(/<meta\s+property="og:[^"]*"[^>]*>/gi, '')
+    .replace(/<meta\s+name="twitter:[^"]*"[^>]*>/gi, '')
+    .replace(/<link\s+rel="(?:canonical|alternate)"[^>]*>/gi, '')
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gi, '');
+  const image = escapeHtml(`${meta.origin}/og-image.png`);
   const tags = [
     `<meta name="description" content="${d}" />`,
+    // Páginas de usuarios: no se indexan en buscadores (se comparten por enlace)
+    `<meta name="robots" content="noindex, follow" />`,
     `<meta property="og:site_name" content="Crea URL" />`,
+    `<meta property="og:locale" content="es_ES" />`,
     `<meta property="og:type" content="${escapeHtml(meta.type)}" />`,
     `<meta property="og:title" content="${t}" />`,
     `<meta property="og:description" content="${d}" />`,
     `<meta property="og:url" content="${u}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${image}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:image" content="${image}" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
     `<link rel="canonical" href="${u}" />`,
@@ -559,6 +569,7 @@ async function servePreview(request: Request, env: Env, kind: 'p' | 'c', slug: s
       description,
       url: `${url.origin}/${kind}/${slug}`,
       type: kind === 'p' ? 'article' : 'website',
+      origin: url.origin,
     });
     return new Response(html, {
       status: 200,
@@ -566,11 +577,74 @@ async function servePreview(request: Request, env: Env, kind: 'p' | 'c', slug: s
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=300',
         'X-Content-Type-Options': 'nosniff',
+        'X-Robots-Tag': 'noindex, follow',
       },
     });
   } catch (err) {
     console.error('servePreview falló (se sirve la SPA normal):', err);
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Estadísticas de visitas: contador total (pages.views_count) + detalle por día UTC
+// (page_views_daily). La tabla se crea sola la primera vez.
+// ---------------------------------------------------------------------------
+let viewsTableReady = false;
+const VIEWS_RETENTION_DAYS = 400;
+const BOT_UA = /bot|crawler|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|slack|discord|linkedin|embedly|headless|curl|wget|python-requests/i;
+
+function isBot(request: Request): boolean {
+  return BOT_UA.test(request.headers.get('user-agent') || '');
+}
+
+async function ensureViewsTable(env: Env): Promise<void> {
+  if (viewsTableReady) return;
+  await env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS page_views_daily (slug TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (slug, day))'
+  )
+    .bind()
+    .run();
+  viewsTableReady = true;
+}
+
+async function recordView(env: Env, slug: string): Promise<void> {
+  const now = new Date();
+  await env.DB.prepare('UPDATE pages SET views_count = views_count + 1, last_viewed_at = ? WHERE slug = ?')
+    .bind(now.toISOString(), slug)
+    .run();
+  try {
+    await ensureViewsTable(env);
+    await env.DB.prepare(
+      'INSERT INTO page_views_daily (slug, day, count) VALUES (?, ?, 1) ON CONFLICT(slug, day) DO UPDATE SET count = count + 1'
+    )
+      .bind(slug, now.toISOString().slice(0, 10))
+      .run();
+  } catch (err) {
+    console.error('recordView: no se pudo guardar el detalle diario:', err);
+  }
+}
+
+async function deleteViewStats(env: Env, slugs: string[]): Promise<void> {
+  if (slugs.length === 0) return;
+  try {
+    await ensureViewsTable(env);
+    const placeholders = slugs.map(() => '?').join(',');
+    await env.DB.prepare(`DELETE FROM page_views_daily WHERE slug IN (${placeholders})`)
+      .bind(...slugs)
+      .run();
+  } catch (err) {
+    console.error('deleteViewStats falló:', err);
+  }
+}
+
+async function purgeOldViewStats(env: Env): Promise<void> {
+  try {
+    await ensureViewsTable(env);
+    const cutoff = new Date(Date.now() - VIEWS_RETENTION_DAYS * 86400000).toISOString().slice(0, 10);
+    await env.DB.prepare('DELETE FROM page_views_daily WHERE day < ?').bind(cutoff).run();
+  } catch (err) {
+    console.error('purgeOldViewStats falló:', err);
   }
 }
 
@@ -582,6 +656,7 @@ function jsonResponse(data: any, status = 200) {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+      'X-Robots-Tag': 'noindex',
     },
   });
 }
@@ -705,17 +780,14 @@ export default {
         return new Response('Contenido HTML no encontrado en Supabase Storage.', { status: 404 });
       }
 
-      await env.DB.prepare(
-        'UPDATE pages SET views_count = views_count + 1, last_viewed_at = ? WHERE slug = ?'
-      )
-        .bind(new Date().toISOString(), slug)
-        .run();
+      if (!isBot(request)) await recordView(env, slug);
 
       return new Response(html, {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Content-Security-Policy': 'sandbox allow-scripts allow-forms allow-modals allow-popups;',
           'X-Content-Type-Options': 'nosniff',
+          'X-Robots-Tag': 'noindex', // contenido de usuarios: no se indexa
         },
       });
     }
@@ -983,6 +1055,10 @@ export default {
       let html: string | undefined;
       if (!p.has_password) {
         html = (await supabaseDownload(env, slug)) || undefined;
+        if (html !== undefined && !isBot(request)) {
+          await recordView(env, slug);
+          p.views_count = (p.views_count || 0) + 1;
+        }
       }
 
       return jsonResponse({
@@ -1002,6 +1078,63 @@ export default {
         },
         hasPassword: !!p.has_password,
         html,
+      });
+    }
+
+    // GET /api/pages/:slug/stats?days=30  (solo propietario o admin)
+    const statsMatch = path.match(/^\/api\/pages\/([^/]+)\/stats$/);
+    if (statsMatch && request.method === 'GET') {
+      const slug = decodeURIComponent(statsMatch[1]);
+      const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
+      if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
+      if (!canManage(identity, p.user_id)) {
+        return jsonResponse({ error: 'No tienes permiso para ver las estadísticas de esta página.' }, 403);
+      }
+      const days = Math.min(90, Math.max(7, parseInt(url.searchParams.get('days') || '30', 10) || 30));
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+      const startStr = new Date(today.getTime() - (days - 1) * 86400000).toISOString().slice(0, 10);
+
+      let counts = new Map<string, number>();
+      let trackedTotal = 0;
+      try {
+        await ensureViewsTable(env);
+        const rows = await env.DB.prepare(
+          'SELECT day, count FROM page_views_daily WHERE slug = ? AND day >= ? ORDER BY day ASC'
+        )
+          .bind(slug, startStr)
+          .all<any>();
+        for (const r of rows.results || []) counts.set(r.day, r.count);
+        const sum = await env.DB.prepare('SELECT COALESCE(SUM(count), 0) AS n FROM page_views_daily WHERE slug = ?')
+          .bind(slug)
+          .first<any>();
+        trackedTotal = sum?.n || 0;
+      } catch (err) {
+        console.error('stats: no se pudo leer el detalle diario:', err);
+      }
+
+      const series: { day: string; views: number }[] = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today.getTime() - i * 86400000).toISOString().slice(0, 10);
+        series.push({ day: d, views: counts.get(d) || 0 });
+      }
+      const viewsInRange = series.reduce((a, x) => a + x.views, 0);
+      const last7 = series.slice(-7).reduce((a, x) => a + x.views, 0);
+      const best = series.reduce((b, x) => (x.views > (b?.views ?? 0) ? x : b), null as { day: string; views: number } | null);
+
+      return jsonResponse({
+        slug,
+        title: p.title,
+        days,
+        series,
+        totalViews: p.views_count || 0,
+        viewsInRange,
+        viewsLast7: last7,
+        viewsToday: counts.get(todayStr) || 0,
+        bestDay: best && best.views > 0 ? best : null,
+        lastViewedAt: p.last_viewed_at || null,
+        createdAt: p.created_at,
+        viewsBeforeTracking: Math.max(0, (p.views_count || 0) - trackedTotal),
       });
     }
 
@@ -1137,6 +1270,7 @@ export default {
         console.error(`DELETE ${slug}: no se pudo borrar el archivo de Storage:`, err);
       }
       await env.DB.prepare('DELETE FROM pages WHERE slug = ?').bind(slug).run();
+      await deleteViewStats(env, [slug]);
       return jsonResponse({ success: true });
     }
 
@@ -1181,9 +1315,7 @@ export default {
         }
         const html = await supabaseDownload(env, slug);
         if (html === null) return jsonResponse({ error: 'Contenido no encontrado en Supabase Storage.' }, 404);
-        await env.DB.prepare('UPDATE pages SET views_count = views_count + 1, last_viewed_at = ? WHERE slug = ?')
-          .bind(new Date().toISOString(), slug)
-          .run();
+        await recordView(env, slug);
         return jsonResponse({ success: true, html });
       } catch (err: any) {
         return jsonResponse({ error: err.message }, 500);
@@ -1383,9 +1515,18 @@ export default {
       const assetRes = await env.ASSETS.fetch(request);
       // Rutas del cliente (/p/:slug, /c/:slug, /admin, /collections, /acerca-de...):
       // si no hay archivo estático, servir la SPA para que React resuelva la ruta.
-      if (assetRes.status === 404 && request.method === 'GET' && !path.startsWith('/api/')) {
+      const lastSegment = path.split('/').pop() || '';
+      const looksLikeFile = lastSegment.includes('.'); // /assets/x.js, /favicon.ico...: un 404 real, no una ruta de la SPA
+      if (assetRes.status === 404 && request.method === 'GET' && !path.startsWith('/api/') && !looksLikeFile) {
         const indexReq = new Request(new URL('/index.html', url.origin).toString(), request);
-        return env.ASSETS.fetch(indexReq);
+        const spaRes = await env.ASSETS.fetch(indexReq);
+        // Rutas de páginas/colecciones que no existen (o caducadas): que no se indexen
+        if (/^\/(p|c)\//.test(path)) {
+          const headers = new Headers(spaRes.headers);
+          headers.set('X-Robots-Tag', 'noindex');
+          return new Response(spaRes.body, { status: spaRes.status, headers });
+        }
+        return spaRes;
       }
       return assetRes;
     }
@@ -1396,6 +1537,7 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
     try {
       await purgeRateLimits(env);
+      await purgeOldViewStats(env);
       const { purged, failed, pending } = await purgeExpired(env);
       console.log(`Limpieza programada: ${purged} borradas, ${failed} con error, ${pending} caducadas pendientes.`);
     } catch (err) {

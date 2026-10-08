@@ -71,11 +71,11 @@ export const PublishModal: React.FC<PublishModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-[#0f172a] border border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-strong rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -85,7 +85,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({
           <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mx-auto mb-3">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold text-white tracking-tight">{isUpdate ? '¡Cambios Guardados!' : '¡Página Publicada con Éxito!'}</h2>
+          <h2 className="text-xl font-bold text-strong tracking-tight">{isUpdate ? '¡Cambios Guardados!' : '¡Página Publicada con Éxito!'}</h2>
           <p className="text-xs text-slate-400 mt-1">
             {isUpdate ? 'Tu página se ha actualizado y mantiene la misma URL.' : 'Tu archivo estático ya está alojado y accesible globalmente.'}
           </p>
@@ -249,7 +249,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-strong bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
             >
               Cerrar
             </button>

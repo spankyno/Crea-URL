@@ -239,7 +239,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Top Banner / Welcome */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-strong tracking-tight flex items-center gap-2">
             <span>Panel de Control</span>
             <span className="text-xs font-mono font-normal px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               {currentUser.role === 'anon' ? 'Modo Anónimo' : currentUser.role === 'admin' ? 'SuperAdmin' : 'Cuenta Pro Free'}
@@ -253,7 +253,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={loadData}
-            className="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-strong bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 transition-colors"
             title="Recargar datos"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -270,32 +270,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#0f172a] border border-slate-800/90 rounded-xl p-4 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800/90 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span>Páginas Publicadas</span>
             <FileCode className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white tabular-nums">{pages.length}</div>
+          <div className="text-2xl font-bold font-mono text-strong tabular-nums">{pages.length}</div>
           <div className="text-[11px] text-slate-500 mt-1">
             {currentUser.role === 'anon' ? 'Sin límite de páginas (15 días c/u)' : 'Alojamiento extendido a 3 meses'}
           </div>
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-800/90 rounded-xl p-4 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800/90 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span>Visitas Totales</span>
             <Eye className="w-4 h-4 text-sky-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white tabular-nums">{totalViews}</div>
+          <div className="text-2xl font-bold font-mono text-strong tabular-nums">{totalViews}</div>
           <div className="text-[11px] text-slate-500 mt-1">Conteo en tiempo real</div>
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-800/90 rounded-xl p-4 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800/90 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span>Almacenamiento Usado</span>
             <HardDrive className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white tabular-nums">
+          <div className="text-2xl font-bold font-mono text-strong tabular-nums">
             {formatBytes(totalStorage)}
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2">
@@ -375,7 +375,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Pages Table */}
       {activeTab === 'pages' && (
-        <div className="bg-[#0f172a] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
           {loading ? (
             <div className="p-12 text-center text-slate-400 font-mono text-xs">Cargando páginas...</div>
           ) : pages.length === 0 ? (
@@ -475,7 +475,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               onClick={() => onViewPage(p.slug)}
-                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-strong hover:bg-slate-800 rounded transition-colors"
                               title="Ver página"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -558,7 +558,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {collections.length === 0 ? (
-              <div className="sm:col-span-3 p-12 text-center text-slate-400 bg-[#0f172a] border border-slate-800 rounded-xl">
+              <div className="sm:col-span-3 p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-xl">
                 <FolderKanban className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                 <p className="text-sm font-medium text-slate-200 mb-1">Sin colecciones creadas</p>
                 <p className="text-xs text-slate-500 mb-4">
@@ -575,7 +575,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               collections.map((c) => (
                 <div
                   key={c.id}
-                  className="bg-[#0f172a] border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors"
+                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors"
                 >
                   <div>
                     <h3 className="font-semibold text-slate-100 text-sm mb-1">{c.title}</h3>
@@ -589,7 +589,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="text-slate-500 font-mono">{c.pageSlugs.length} páginas</span>
                     <button
                       onClick={() => onViewCollection(c.slug)}
-                      className="px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:text-strong bg-slate-800 hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
                     >
                       <span>Abrir</span>
                       <ExternalLink className="w-3 h-3" />
@@ -609,12 +609,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setStatsModalPage(null)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-5"
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <h3 className="text-base font-bold text-strong flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-violet-400 shrink-0" />
                   <span className="truncate">Estadísticas · {statsModalPage.title || statsModalPage.slug}</span>
                 </h3>
@@ -626,7 +626,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     key={d}
                     onClick={() => handleChangeStatsDays(d)}
                     className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                      statsDays === d ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                      statsDays === d ? 'bg-slate-700 text-strong' : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {d} días
@@ -654,7 +654,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ].map((c) => (
                     <div key={c.label} className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl">
                       <div className="text-[10px] uppercase tracking-wide text-slate-500">{c.label}</div>
-                      <div className="text-xl font-bold text-white tabular-nums mt-0.5">{c.value}</div>
+                      <div className="text-xl font-bold text-strong tabular-nums mt-0.5">{c.value}</div>
                     </div>
                   ))}
                 </div>
@@ -736,8 +736,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* QR Modal */}
       {qrModalPage && qrDataUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center space-y-4">
-            <h3 className="text-base font-bold text-white">Código QR para {qrModalPage.title}</h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center space-y-4">
+            <h3 className="text-base font-bold text-strong">Código QR para {qrModalPage.title}</h3>
             <div className="p-3 bg-white rounded-xl mx-auto inline-block shadow-md">
               <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
             </div>
@@ -765,8 +765,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Password Modal */}
       {passwordModalPage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-bold text-strong flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-400" />
               <span>Contraseña de Acceso</span>
             </h3>
@@ -778,12 +778,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Nueva contraseña (o vacío para quitar)"
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-strong outline-none focus:border-emerald-500"
             />
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setPasswordModalPage(null)}
-                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                className="px-3 py-1.5 text-xs text-slate-400 hover:text-strong"
               >
                 Cancelar
               </button>

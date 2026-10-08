@@ -44,7 +44,7 @@ export const PreviewZone: React.FC<PreviewZoneProps> = ({ html, onOpenTemplates 
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0d121c] rounded-xl border border-slate-800/90 overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-full bg-app-alt rounded-xl border border-slate-800/90 overflow-hidden shadow-2xl">
       {/* Top Preview Controls Bar */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs">
         {/* Left: Device Switcher */}
@@ -133,7 +133,7 @@ export const PreviewZone: React.FC<PreviewZoneProps> = ({ html, onOpenTemplates 
       )}
 
       {/* Frame Viewport Container */}
-      <div className="flex-1 overflow-auto bg-[#080c14] p-3 sm:p-5 flex items-center justify-center">
+      <div className="flex-1 overflow-auto bg-app-deep p-3 sm:p-5 flex items-center justify-center">
         {html ? (
           <div
             className={`h-full transition-all duration-300 flex flex-col bg-white rounded-lg shadow-xl overflow-hidden border border-slate-800 ${getContainerWidth()}`}

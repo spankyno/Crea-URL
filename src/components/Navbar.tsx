@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#0b0f17]/90 backdrop-blur-md px-4 lg:px-8 py-3 transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-app/90 backdrop-blur-md px-4 lg:px-8 py-3 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Zone 1: Single text element wordmark */}
         <div className="flex items-center gap-3">
@@ -77,11 +77,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Globe className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-base font-semibold tracking-tight text-white flex items-center gap-1.5">
+              <span className="text-base font-semibold tracking-tight text-strong flex items-center gap-1.5">
                 Crea URL
-                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-normal">
-                  host-html
-                </span>
               </span>
             </div>
           </button>
@@ -142,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={onOpenTemplates}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-md border border-slate-700/60 transition-colors whitespace-nowrap"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-strong bg-slate-800/80 hover:bg-slate-800 rounded-md border border-slate-700/60 transition-colors whitespace-nowrap"
             title="Explorar plantillas pre-diseñadas"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -180,7 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Menu Dropdown: selector de roles simulados, solo en desarrollo */}
             {import.meta.env.DEV && (
-            <div className="absolute right-0 mt-1 w-56 p-1.5 bg-[#111827] border border-slate-800 rounded-xl shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 z-50">
+            <div className="absolute right-0 mt-1 w-56 p-1.5 bg-app-card border border-slate-800 rounded-xl shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 z-50">
               <div className="px-2.5 py-1.5 text-[11px] text-slate-400 border-b border-slate-800/80 mb-1">
                 {IS_CLERK_ENABLED ? 'Roles y Simulación' : 'Modo Demostración / Simulación'}
               </div>
@@ -218,7 +215,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="p-1.5 text-slate-400 hover:text-slate-200 rounded-md border border-slate-800 hover:bg-slate-800/60 transition-colors"
-            title="Alternar modo visual"
+            title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           >
             {darkMode ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4" />}
           </button>

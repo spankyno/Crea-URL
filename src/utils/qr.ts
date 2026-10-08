@@ -1,7 +1,9 @@
-import QRCode from 'qrcode';
+// qrcode (~23 kB) se descarga solo cuando se genera un QR
+const loadQrCode = async () => (await import('qrcode')).default;
 
 export async function generateQrDataUrl(text: string): Promise<string> {
   try {
+    const QRCode = await loadQrCode();
     return await QRCode.toDataURL(text, {
       width: 400,
       margin: 2,
@@ -19,6 +21,7 @@ export async function generateQrDataUrl(text: string): Promise<string> {
 
 export async function generateQrSvgString(text: string): Promise<string> {
   try {
+    const QRCode = await loadQrCode();
     return await QRCode.toString(text, {
       type: 'svg',
       margin: 2,

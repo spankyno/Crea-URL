@@ -45,3 +45,11 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   window_end INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rate_limits_window_end ON rate_limits(window_end);
+
+-- Visitas por día (UTC). El Worker también la crea automáticamente si no existe.
+CREATE TABLE IF NOT EXISTS page_views_daily (
+  slug TEXT NOT NULL,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (slug, day)
+);

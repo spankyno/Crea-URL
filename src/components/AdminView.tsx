@@ -125,7 +125,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
         <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto mb-4">
           <ShieldCheck className="w-7 h-7" />
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">Panel de Administración Protegido</h2>
+        <h2 className="text-xl font-bold text-strong mb-2">Panel de Administración Protegido</h2>
         <p className="text-xs text-slate-400 mb-6">
           Esta zona requiere privilegios de Administrador o ingresar la clave maestra de acceso.
         </p>
@@ -136,7 +136,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
             value={adminKeyInput}
             onChange={(e) => setAdminKeyInput(e.target.value)}
             placeholder="Introduce la clave de Admin..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-emerald-500"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-strong text-center outline-none focus:border-emerald-500"
           />
           <button
             type="submit"
@@ -157,7 +157,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-strong tracking-tight flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-emerald-400" />
             <span>Consola de Administración Global</span>
           </h1>
@@ -169,7 +169,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
         <div className="flex items-center gap-2">
           <button
             onClick={loadAdminData}
-            className="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-strong bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 transition-colors"
             title="Actualizar datos"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -188,43 +188,43 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
       {/* Global Metrics Grid */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
               <span>Total Páginas</span>
               <FileCode className="w-3.5 h-3.5 text-slate-500" />
             </div>
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">{stats.totalPages}</div>
+            <div className="text-2xl font-bold font-mono text-strong tabular-nums">{stats.totalPages}</div>
             <div className="text-[11px] text-slate-500 mt-1">
               {stats.activePages} activas · {stats.expiredPages} expiradas
             </div>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
               <span>Visitas Totales</span>
               <Eye className="w-3.5 h-3.5 text-sky-400" />
             </div>
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">{stats.totalViews}</div>
+            <div className="text-2xl font-bold font-mono text-strong tabular-nums">{stats.totalViews}</div>
             <div className="text-[11px] text-slate-500 mt-1">Tráfico total acumulado</div>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
               <span>Almacenamiento Total</span>
               <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">
+            <div className="text-2xl font-bold font-mono text-strong tabular-nums">
               {formatBytes(stats.totalSizeBytes)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1">En almacenamiento Supabase</div>
           </div>
 
-          <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-xs text-slate-400 mb-1 flex items-center justify-between">
               <span>Colecciones Creadas</span>
               <FolderKanban className="w-3.5 h-3.5 text-purple-400" />
             </div>
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">{stats.totalCollections}</div>
+            <div className="text-2xl font-bold font-mono text-strong tabular-nums">{stats.totalCollections}</div>
             <div className="text-[11px] text-slate-500 mt-1">
               {stats.passwordProtectedPages} con contraseña
             </div>
@@ -241,11 +241,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por título, slug o userId..."
-            className="w-full bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-strong outline-none focus:border-emerald-500"
           />
         </div>
 
-        <div className="flex items-center gap-1 bg-[#0f172a] p-1 rounded-xl border border-slate-800 overflow-x-auto text-xs">
+        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto text-xs">
           {(['all', 'active', 'expired', 'password', 'ephemeral'] as const).map((filter) => (
             <button
               key={filter}
@@ -271,7 +271,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
       </div>
 
       {/* Pages Data Table */}
-      <div className="bg-[#0f172a] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -337,7 +337,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
                         <div className="inline-flex items-center gap-2">
                           <button
                             onClick={() => onViewPage(p.slug)}
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-strong hover:bg-slate-800 rounded transition-colors"
                             title="Previsualizar"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
