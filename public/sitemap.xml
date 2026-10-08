@@ -6,7 +6,7 @@
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://crea-url.kbo1.workers.dev/og-image.png</image:loc>
+      <image:loc>https://crea-url.kbo1.workers.dev/og-image.jpg</image:loc>
       <image:title>Crea URL: alojamiento gratuito de páginas HTML</image:title>
     </image:image>
   </url>
@@ -16,7 +16,7 @@
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://crea-url.kbo1.workers.dev/og-image.png</image:loc>
+      <image:loc>https://crea-url.kbo1.workers.dev/og-image.jpg</image:loc>
       <image:title>Acerca de Crea URL</image:title>
     </image:image>
   </url>

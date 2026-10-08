@@ -97,7 +97,7 @@ Debe mostrar `authConfigured: true`, tu `userId` y `role` (`admin` si tu ID est�
 
 ## SEO, tema visual y seguimiento
 
-- **Imagen para compartir:** `public/og-image.png` (no está incluida en este repositorio de ejemplo: súbela tú). La usan las etiquetas `og:image` / `twitter:image`, la página `/acerca-de` y las vistas previas de `/p/...` y `/c/...`. Tamaño recomendado: 1200×630 px.
+- **Imagen para compartir:** `public/og-image.jpg`. La usan las etiquetas `og:image` / `twitter:image`, la página `/acerca-de` y las vistas previas de `/p/...` y `/c/...`. Formato: JPEG de 1200×630 px (≈145 kB, proporción 1,91:1 recomendada para tarjetas de redes sociales). Las medidas están declaradas en `index.html`, `public/acerca-de.html` y el Worker: si la cambias, actualízalas.
 - **Dominio:** las URLs absolutas (canonical, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt`) apuntan a `https://crea-url.kbo1.workers.dev`. Si cambias de dominio, sustitúyelo en `index.html`, `public/acerca-de.html`, `public/sitemap.xml` y `public/robots.txt`.
 - **Indexación:** solo se indexan `/` y `/acerca-de`. Las páginas de usuarios (`/p/`, `/c/`, `/raw/`) y la API llevan `noindex` (meta robots o cabecera `X-Robots-Tag`).
 - **Search Console:** la etiqueta `google-site-verification` está en `index.html`. Envía `https://crea-url.kbo1.workers.dev/sitemap.xml` desde Search Console.

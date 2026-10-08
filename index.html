@@ -44,7 +44,10 @@
       property="og:description"
       content="Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña. Gratis, sin git ni despliegues."
     />
-    <meta property="og:image" content="https://crea-url.kbo1.workers.dev/og-image.png" />
+    <meta property="og:image" content="https://crea-url.kbo1.workers.dev/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública" />
 
     <!-- Twitter / X -->
@@ -54,7 +57,7 @@
       name="twitter:description"
       content="Pega o sube tu HTML y obtén al instante una URL pública, código QR, colecciones y protección con contraseña."
     />
-    <meta name="twitter:image" content="https://crea-url.kbo1.workers.dev/og-image.png" />
+    <meta name="twitter:image" content="https://crea-url.kbo1.workers.dev/og-image.jpg" />
     <meta name="twitter:image:alt" content="Crea URL: alojamiento gratuito de páginas HTML con URL pública" />
 
     <!-- Iconos y PWA -->
@@ -87,7 +90,12 @@
             "browserRequirements": "Requiere un navegador moderno con JavaScript",
             "inLanguage": "es",
             "isAccessibleForFree": true,
-            "image": "https://crea-url.kbo1.workers.dev/og-image.png",
+            "image": {
+              "@type": "ImageObject",
+              "url": "https://crea-url.kbo1.workers.dev/og-image.jpg",
+              "width": 1200,
+              "height": 630
+            },
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
             "featureList": [
               "Publicación de HTML con URL pública",

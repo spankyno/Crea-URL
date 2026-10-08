@@ -507,7 +507,7 @@ function injectShareMeta(
     .replace(/<meta\s+name="twitter:[^"]*"[^>]*>/gi, '')
     .replace(/<link\s+rel="(?:canonical|alternate)"[^>]*>/gi, '')
     .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gi, '');
-  const image = escapeHtml(`${meta.origin}/og-image.png`);
+  const image = escapeHtml(`${meta.origin}/og-image.jpg`);
   const tags = [
     `<meta name="description" content="${d}" />`,
     // Páginas de usuarios: no se indexan en buscadores (se comparten por enlace)
@@ -519,6 +519,9 @@ function injectShareMeta(
     `<meta property="og:description" content="${d}" />`,
     `<meta property="og:url" content="${u}" />`,
     `<meta property="og:image" content="${image}" />`,
+    `<meta property="og:image:type" content="image/jpeg" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:image" content="${image}" />`,
     `<meta name="twitter:title" content="${t}" />`,
