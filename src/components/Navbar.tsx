@@ -122,6 +122,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             Mi Dashboard
           </button>
 
+          {currentUser.role === 'admin' && (
           <button
             onClick={() => setCurrentTab('admin')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 whitespace-nowrap ${
@@ -133,6 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ShieldCheck className="w-3.5 h-3.5" />
             Admin
           </button>
+          )}
         </nav>
 
         {/* Zone 3: Actions & Auth / Role Switcher */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { lazyWithReload } from './utils/lazyWithReload';
 import { STARTER_HTML } from './constants/starterHtml';
 import { Navbar } from './components/Navbar';
@@ -46,31 +46,48 @@ function makeAnonSession(): UserSession {
   return { id, name: 'Invitado Anónimo', role: 'anon', isRegistered: false };
 }
 
-function ClerkUserSync({ onUserChange }: { onUserChange: (user: UserSession) => void }) {
+function ClerkUserSync({
+  onUserChange,
+  onReady,
+}: {
+  onUserChange: (user: UserSession) => void;
+  onReady: () => void;
+}) {
   const { isLoaded, isSignedIn, user } = useUser();
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (isSignedIn && user) {
-      const email = user.primaryEmailAddress?.emailAddress;
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@host-html.com';
-      const isRoleAdmin =
-        user.publicMetadata?.role === 'admin' ||
-        (email && email.toLowerCase() === adminEmail.toLowerCase());
+    let cancelled = false;
 
-      onUserChange({
+    if (isSignedIn && user) {
+      const base: UserSession = {
         id: user.id,
-        email: email || undefined,
+        email: user.primaryEmailAddress?.emailAddress || undefined,
         name: user.fullName || user.username || 'Usuario Registrado',
-        role: isRoleAdmin ? 'admin' : 'user',
+        role: 'user',
         isRegistered: true,
         avatarUrl: user.imageUrl,
-      });
+      };
+      onUserChange(base);
+      // El rol de administrador lo decide el servidor (token de Clerk verificado), no el navegador
+      api
+        .getMe(base)
+        .then((me) => {
+          if (!cancelled && me.role === 'admin') onUserChange({ ...base, role: 'admin' });
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) onReady();
+        });
     } else {
       // Sin sesión de Clerk: volver a invitado (conserva su id anónimo para ver sus páginas)
       onUserChange(makeAnonSession());
+      onReady();
     }
-  }, [isLoaded, isSignedIn, user, onUserChange]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, user, onUserChange, onReady]);
 
   return null;
 }
@@ -82,6 +99,9 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'editor' | 'dashboard' | 'collections' | 'admin'>('editor');
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [activeCollectionSlug, setActiveCollectionSlug] = useState<string | null>(null);
+  // true cuando ya se conoce el rol verificado (sin Clerk no hay nada que esperar)
+  const [authReady, setAuthReady] = useState<boolean>(!IS_CLERK_ENABLED);
+  const handleAuthReady = useCallback(() => setAuthReady(true), []);
 
   // User state (Clerk simulation)
   const [currentUser, setCurrentUser] = useState<UserSession>(() => {
@@ -311,7 +331,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors bg-app text-slate-100`}>
-      {IS_CLERK_ENABLED && <ClerkUserSync onUserChange={setCurrentUser} />}
+      {IS_CLERK_ENABLED && <ClerkUserSync onUserChange={setCurrentUser} onReady={handleAuthReady} />}
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
@@ -417,11 +437,24 @@ export default function App() {
           />
         )}
 
-        {currentTab === 'admin' && (
+        {currentTab === 'admin' && !authReady && <LoadingFallback />}
+        {currentTab === 'admin' && authReady && currentUser.role === 'admin' && (
           <AdminView
             currentUser={currentUser}
             onViewPage={handleViewPage}
           />
+        )}
+        {currentTab === 'admin' && authReady && currentUser.role !== 'admin' && (
+          <div className="max-w-md mx-auto py-20 px-4 text-center space-y-3" role="alert">
+            <h2 className="text-lg font-bold text-strong">Acceso restringido</h2>
+            <p className="text-sm text-slate-400">Esta sección es solo para administradores.</p>
+            <button
+              onClick={() => navigateTo('editor')}
+              className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 transition-colors cursor-pointer"
+            >
+              Volver al editor
+            </button>
+          </div>
         )}
         </Suspense>
       </main>

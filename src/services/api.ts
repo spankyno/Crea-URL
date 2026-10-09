@@ -60,6 +60,13 @@ class ApiService {
     return res.json();
   }
 
+  /** Identidad que el servidor reconoce para esta sesión (rol verificado con el token de Clerk). */
+  async getMe(user: UserSession): Promise<{ role: 'anon' | 'user' | 'admin'; userId: string | null; authConfigured: boolean }> {
+    const res = await fetch('/api/me', { headers: await this.getHeaders(user) });
+    if (!res.ok) throw new Error('No se pudo verificar la sesión');
+    return res.json();
+  }
+
   /** Estadísticas de visitas de una página propia (últimos N días, 7-90). */
   async getPageStats(slug: string, days: number, user: UserSession): Promise<PageStats> {
     const res = await fetch(`/api/pages/${encodeURIComponent(slug)}/stats?days=${days}`, {
