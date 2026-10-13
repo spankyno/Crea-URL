@@ -44,14 +44,11 @@ Clerk ofrece un plan **Free Forever** de hasta **10.000 usuarios activos mensual
 2. Copia el valor de **Publishable key**: `VITE_CLERK_PUBLISHABLE_KEY` (ej. `pk_test_...`).
 
 ### Paso 2.3: Configurar el Rol de Administrador
-Existen dos formas sencillas para otorgar rol `admin` a una cuenta:
-- **Opción A (Variable de Entorno)**: Define `VITE_ADMIN_EMAIL=tuemail@ejemplo.com` en tu archivo `.env`. Cualquier usuario que inicie sesión en Clerk con este email obtendrá rol de Administrador automáticamente.
-- **Opción B (Metadata en Clerk)**: En el panel de Clerk → **Users** → selecciona tu usuario → **Public metadata** → añade:
-  ```json
-  {
-    "role": "admin"
-  }
-  ```
+El rol de administrador **lo decide únicamente el Worker de Cloudflare**, a partir de tu ID de usuario de Clerk. Ya no se concede por correo electrónico ni por metadatos (`VITE_ADMIN_EMAIL` y *Public metadata* dejaron de usarse porque dependían del navegador o de datos que un usuario podría llegar a controlar).
+
+1. En el panel de Clerk → **Users** → selecciona tu usuario y copia su **User ID** (`user_...`).
+2. En Cloudflare → tu Worker → **Settings → Variables and Secrets**, crea `ADMIN_USER_IDS` con ese ID (varios, separados por comas).
+3. Cierra sesión y vuelve a entrar. La pestaña **Admin** aparece solo si el Worker confirma tu rol (puedes comprobarlo en `/api/me`; ver `deploy/README.md`).
 
 ---
 
@@ -59,7 +56,7 @@ Existen dos formas sencillas para otorgar rol `admin` a una cuenta:
 
 | Característica / Límite | Anónimo (Invitado) | Registrado (Pro Free) | Administrador (Admin) |
 | :--- | :--- | :--- | :--- |
-| **Cuenta Requerida** | No | Sí (vía Clerk) | Sí (Email o Metadata) |
+| **Cuenta Requerida** | No | Sí (vía Clerk) | Sí (vía Clerk + `ADMIN_USER_IDS`) |
 | **Tamaño Máximo / Archivo** | 1 MB | 10 MB | Ilimitado |
 | **Tiempo de Retención** | 15 días | 90 días (3 meses) | Ilimitado (Prorrogable) |
 | **Límite de Publicaciones** | 30 páginas / hora | 120 páginas / hora | Sin límite |
@@ -131,5 +128,4 @@ SUPABASE_STORAGE_BUCKET=html-pages
 
 # Clerk Auth (Opcional en local; si no se especifica, funciona en modo simulación)
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-VITE_ADMIN_EMAIL=tuemail@ejemplo.com
 ```

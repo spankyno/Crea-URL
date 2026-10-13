@@ -7,7 +7,7 @@ keep_vars = true
 [assets]
 directory = "dist"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+# Sin not_found_handling: la SPA la resuelve el Worker (rutas sin extensión → index.html; archivos inexistentes → 404 real)
 run_worker_first = true
 
 # Cloudflare D1 (metadatos de páginas)

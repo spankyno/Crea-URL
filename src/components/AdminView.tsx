@@ -30,19 +30,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired' | 'password' | 'ephemeral'>('all');
   const [isPurging, setIsPurging] = useState(false);
-  const [adminKeyInput, setAdminKeyInput] = useState('');
-  const [isUnlocked, setIsUnlocked] = useState(currentUser.role === 'admin');
 
   const loadAdminData = async () => {
     setLoading(true);
     try {
       const [fetchedStats, fetchedPages] = await Promise.all([
         api.getAdminStats(currentUser),
-        api.getPages({ ...currentUser, role: 'admin' }),
+        api.getPages(currentUser),
       ]);
       setStats(fetchedStats);
       setAllPages(fetchedPages);
-      setIsUnlocked(true);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -51,20 +48,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
   };
 
   useEffect(() => {
-    if (currentUser.role === 'admin' || isUnlocked) {
+    // El acceso lo decide el servidor (token de Clerk verificado); aquí no hay clave que introducir
+    if (currentUser.role === 'admin') {
       loadAdminData();
     }
-  }, [currentUser, isUnlocked]);
-
-  const handleManualUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminKeyInput.trim() === 'admin-secret-creaurl') {
-      setIsUnlocked(true);
-      loadAdminData();
-    } else {
-      alert('Clave de administrador incorrecta. Prueba con: admin-secret-creaurl');
-    }
-  };
+  }, [currentUser]);
 
   const handlePurgeExpired = async () => {
     if (!window.confirm('¿Seguro que deseas eliminar definitivamente todas las páginas expiradas del almacenamiento?')) return;
@@ -99,7 +87,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
     const matchesQuery =
       page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       page.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      page.userId.toLowerCase().includes(searchQuery.toLowerCase());
+      (page.userId || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!matchesQuery) return false;
 
@@ -119,38 +107,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, onViewPage })
     return true;
   });
 
-  if (!isUnlocked && currentUser.role !== 'admin') {
-    return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center animate-in fade-in duration-200">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto mb-4">
-          <ShieldCheck className="w-7 h-7" />
-        </div>
-        <h2 className="text-xl font-bold text-strong mb-2">Panel de Administración Protegido</h2>
-        <p className="text-xs text-slate-400 mb-6">
-          Esta zona requiere privilegios de Administrador o ingresar la clave maestra de acceso.
-        </p>
-
-        <form onSubmit={handleManualUnlock} className="space-y-3">
-          <input
-            type="password"
-            value={adminKeyInput}
-            onChange={(e) => setAdminKeyInput(e.target.value)}
-            placeholder="Introduce la clave de Admin..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-strong text-center outline-none focus:border-emerald-500"
-          />
-          <button
-            type="submit"
-            className="w-full py-2.5 text-xs font-semibold bg-emerald-400 hover:bg-emerald-300 text-slate-950 rounded-xl transition-colors shadow-sm"
-          >
-            Desbloquear Consola Admin
-          </button>
-        </form>
-        <p className="text-[11px] text-slate-500 mt-4">
-          Tip: También puedes cambiar tu rol a "Administrador" desde el menú superior.
-        </p>
-      </div>
-    );
-  }
+  if (currentUser.role !== 'admin') return null; // App.tsx ya muestra «Acceso restringido»
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-200">

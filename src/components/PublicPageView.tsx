@@ -18,6 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { PageItem } from '../types';
+import { SandboxedFrame } from './SandboxedFrame';
 import { api } from '../services/api';
 import { generateQrDataUrl, downloadQrImage } from '../utils/qr';
 import { downloadHtmlFile, downloadZipBundle } from '../utils/exporter';
@@ -276,10 +277,9 @@ export const PublicPageView: React.FC<PublicPageViewProps> = ({ slug, onBack }) 
       {/* Frame Container */}
       <div className="flex-1 bg-app-deep overflow-auto flex items-center justify-center p-0 sm:p-2">
         <div className={`h-full transition-all duration-300 flex flex-col bg-white overflow-hidden shadow-2xl ${getContainerWidth()}`}>
-          <iframe
-            srcDoc={htmlContent}
+          <SandboxedFrame
+            html={htmlContent}
             title={page.title}
-            sandbox="allow-scripts allow-forms allow-modals allow-popups"
             className="w-full h-full border-0 bg-white"
           />
         </div>

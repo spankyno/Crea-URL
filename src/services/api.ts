@@ -21,7 +21,6 @@ class ApiService {
     if (import.meta.env.DEV) {
       headers['x-user-role'] = user.role;
       if (user.email) headers['x-user-email'] = user.email;
-      if (user.role === 'admin') headers['x-admin-key'] = 'admin-secret-creaurl';
     }
     return headers;
   }
@@ -58,6 +57,19 @@ class ApiService {
       throw new Error(err.error || 'Contraseña incorrecta');
     }
     return res.json();
+  }
+
+  /**
+   * Cambia el secreto de un usuario anónimo y traslada a él sus páginas y colecciones.
+   * Sustituye identificadores antiguos que llegaron a exponerse en la API pública.
+   */
+  async rotateAnonId(user: UserSession, newId: string): Promise<void> {
+    const res = await fetch('/api/identity/rotate', {
+      method: 'POST',
+      headers: await this.getHeaders(user),
+      body: JSON.stringify({ newId }),
+    });
+    if (!res.ok) throw new Error('No se pudo renovar la identidad anónima');
   }
 
   /** Identidad que el servidor reconoce para esta sesión (rol verificado con el token de Clerk). */

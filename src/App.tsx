@@ -29,22 +29,35 @@ import { useUser } from '@clerk/clerk-react';
 
 const IS_CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
+const MIN_PASSWORD_LENGTH = 8; // igual que el servidor
 const ANON_ID_KEY = 'creaurl_anon_id';
+const ANON_V2_KEY = 'creaurl_anon_v2'; // "1" = secreto anónimo de 24 caracteres, nunca expuesto por la API
+const ANON_PENDING_KEY = 'creaurl_anon_pending'; // secreto nuevo en proceso de rotación
+const ANON_ID_RE = /^anon_[A-Za-z0-9]{4,32}$/;
+
+// El identificador anónimo es un SECRETO (equivale a una contraseña): 24 caracteres ≈ 124 bits
+function randomAnonId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return 'anon_' + Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+}
 
 function makeAnonSession(): UserSession {
   let id = '';
   try {
     id = localStorage.getItem(ANON_ID_KEY) || '';
   } catch (e) {}
-  if (!/^anon_[A-Za-z0-9]{4,32}$/.test(id)) {
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
-    id = 'anon_' + Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+  if (!ANON_ID_RE.test(id)) {
+    id = randomAnonId();
     try {
       localStorage.setItem(ANON_ID_KEY, id);
+      localStorage.setItem(ANON_V2_KEY, '1');
     } catch (e) {}
   }
   return { id, name: 'Invitado Anónimo', role: 'anon', isRegistered: false };
 }
+
+// Evita enviar dos rotaciones a la vez
+let anonRotationInFlight = false;
 
 function ClerkUserSync({
   onUserChange,
@@ -191,6 +204,46 @@ export default function App() {
     } catch (e) {}
   }, [currentUser]);
 
+  // Renovación automática del secreto anónimo (una sola vez) para quien tenía un identificador antiguo
+  useEffect(() => {
+    if (currentUser.role !== 'anon' || anonRotationInFlight) return;
+    let needsRotation = false;
+    try {
+      needsRotation = localStorage.getItem(ANON_V2_KEY) !== '1';
+    } catch (e) {}
+    if (!needsRotation) return;
+
+    // El identificador nuevo se guarda ANTES de enviarlo: si algo falla se reutiliza en el reintento
+    let newId = '';
+    try {
+      newId = localStorage.getItem(ANON_PENDING_KEY) || '';
+      if (!ANON_ID_RE.test(newId)) {
+        newId = randomAnonId();
+        localStorage.setItem(ANON_PENDING_KEY, newId);
+      }
+    } catch (e) {
+      return;
+    }
+
+    anonRotationInFlight = true;
+    api
+      .rotateAnonId(currentUser, newId)
+      .then(() => {
+        try {
+          localStorage.setItem(ANON_ID_KEY, newId);
+          localStorage.setItem(ANON_V2_KEY, '1');
+          localStorage.removeItem(ANON_PENDING_KEY);
+        } catch (e) {}
+        setCurrentUser((prev) => (prev.role === 'anon' ? { ...prev, id: newId } : prev));
+      })
+      .catch(() => {
+        /* se reintenta en la próxima carga con el mismo identificador nuevo */
+      })
+      .finally(() => {
+        anonRotationInFlight = false;
+      });
+  }, [currentUser.id, currentUser.role]);
+
   // Load collections for dropdown
   useEffect(() => {
     if (currentUser.isRegistered) {
@@ -278,6 +331,11 @@ export default function App() {
   const handlePublish = async () => {
     if (!html.trim()) {
       alert('El código HTML no puede estar vacío');
+      return;
+    }
+
+    if (!editingSlug && password.trim().length > 0 && password.trim().length < MIN_PASSWORD_LENGTH) {
+      alert(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
 

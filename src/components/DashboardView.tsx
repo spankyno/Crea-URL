@@ -211,6 +211,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const handleSavePassword = async () => {
     if (!passwordModalPage) return;
+    if (newPassword.trim().length > 0 && newPassword.trim().length < 8) {
+      alert('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
     setIsUpdatingPassword(true);
     try {
       const updated = await api.updatePagePassword(passwordModalPage.slug, newPassword, currentUser);
@@ -277,7 +281,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="text-2xl font-bold font-mono text-strong tabular-nums">{pages.length}</div>
           <div className="text-[11px] text-slate-500 mt-1">
-            {currentUser.role === 'anon' ? 'Sin límite de páginas (15 días c/u)' : 'Alojamiento extendido a 3 meses'}
+            {currentUser.role === 'anon' ? 'Hasta 5 MB en total (15 días c/u)' : 'Alojamiento extendido a 3 meses'}
           </div>
         </div>
 
@@ -715,7 +719,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </p>
                   )}
                   <p className="text-slate-500">
-                    Los días se cuentan en hora UTC. No se cuentan robots ni las vistas previas de redes sociales.
+                    Los días se cuentan en hora UTC. Se cuenta una visita por conexión y hora; no se cuentan robots ni las vistas previas de redes sociales.
                   </p>
                 </div>
               </>
@@ -774,10 +778,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Introduce una contraseña para proteger la página o déjala vacía para hacerla pública.
             </p>
             <input
-              type="text"
+              type="password"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Nueva contraseña (o vacío para quitar)"
+              placeholder="Nueva contraseña, mín. 8 caracteres (o vacío para quitar)"
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-strong outline-none focus:border-emerald-500"
             />
             <div className="flex items-center justify-end gap-2 pt-2">

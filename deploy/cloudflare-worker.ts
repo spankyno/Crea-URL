@@ -39,7 +39,18 @@ export interface Env {
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_ISSUER?: string; // p. ej. https://xxxx.clerk.accounts.dev
   ADMIN_USER_IDS?: string; // ids de usuario de Clerk separados por comas
-  ADMIN_EMAILS?: string; // correos separados por comas (requiere claim "email" en el token)
+  ADMIN_EMAILS?: string; // OBSOLETO: ya no concede acceso de administrador (solo ADMIN_USER_IDS)
+  // Identidades anónimas antiguas (sin hash): "false" desactiva la compatibilidad cuando ya no queden
+  ALLOW_LEGACY_ANON_IDS?: string;
+  // Seguridad de la aplicación (opcionales)
+  CSP_MODE?: string; // "report-only" (por defecto) | "enforce" | "off"
+  ALLOWED_ORIGINS?: string; // orígenes con acceso CORS a la API, separados por comas (además del propio)
+  CSP_EXTRA_SOURCES?: string; // orígenes adicionales permitidos en script-src/connect-src, separados por espacios
+  // Cuotas (MB) y límites; todos opcionales
+  QUOTA_ANON_MB?: string; // almacenamiento total por identificador anónimo (por defecto 5)
+  QUOTA_REGISTERED_MB?: string; // por usuario registrado (por defecto 100)
+  QUOTA_ANON_IP_DAILY_MB?: string; // subida diaria por conexión para anónimos (por defecto 25)
+  READ_LIMIT_PER_MIN?: string; // lecturas públicas por IP y minuto (por defecto 120; 0 = sin límite)
   // Contraseñas de página
   PASSWORD_HASH_ITERATIONS?: string; // por defecto 50000; máximo 100000 (límite de Workers)
 }
@@ -128,7 +139,10 @@ type Role = 'anon' | 'user' | 'admin';
 
 interface Identity {
   role: Role;
-  userId: string | null; // id de Clerk (registrado) o id anónimo "anon_xxx"
+  // Registrado: id de Clerk. Anónimo: HASH del secreto ("anonh_..."); el secreto nunca se guarda ni se devuelve.
+  userId: string | null;
+  // Solo anónimos: el secreto en claro, para reconocer filas creadas antes de usar hashes.
+  legacyUserId?: string | null;
   email?: string;
   authenticated: boolean;
   authConfigured: boolean;
@@ -180,7 +194,7 @@ async function getJwks(issuer: string, forceRefresh = false): Promise<any[]> {
   return jwksCache.keys;
 }
 
-async function verifyClerkToken(token: string, issuer: string): Promise<any> {
+async function verifyClerkToken(token: string, issuer: string, authorizedParties: string[]): Promise<any> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Token con formato inválido.');
   const header = b64urlToJson(parts[0]);
@@ -216,6 +230,12 @@ async function verifyClerkToken(token: string, issuer: string): Promise<any> {
   if (typeof claims.nbf === 'number' && claims.nbf - leeway > nowSec) throw new Error('El token aún no es válido.');
   if (claims.iss !== issuer) throw new Error('Emisor del token no reconocido.');
   if (!claims.sub) throw new Error('Token sin usuario.');
+  // "azp" = origen de la aplicación que pidió el token. Si otra aplicación comparte la instancia de Clerk,
+  // sus tokens llevan su propio origen y aquí se rechazan. (Un token sin "azp" se acepta, como recomienda Clerk.)
+  if (claims.azp !== undefined && !authorizedParties.includes(String(claims.azp).replace(/\/+$/, ''))) {
+    console.warn('[auth] azp no autorizado:', String(claims.azp).slice(0, 100), '| permitidos:', authorizedParties.join(' '));
+    throw new Error('Origen de la sesión no autorizado.');
+  }
   return claims;
 }
 
@@ -228,6 +248,14 @@ function csvList(v: string | undefined): string[] {
 
 const ANON_ID_RE = /^anon_[A-Za-z0-9]{4,32}$/;
 
+/** Clave de propietario de un anónimo: SHA-256 del secreto (128 bits). No es reversible. */
+async function anonOwnerKey(secret: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`creaurl-anon:${secret}`));
+  return 'anonh_' + Array.from(new Uint8Array(buf).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+let adminEmailsWarned = false;
+
 async function resolveIdentity(request: Request, env: Env): Promise<Identity> {
   const issuer = clerkIssuer(env);
   const authConfigured = Boolean(issuer);
@@ -236,16 +264,17 @@ async function resolveIdentity(request: Request, env: Env): Promise<Identity> {
 
   if (bearer && issuer) {
     try {
-      const claims = await verifyClerkToken(bearer[1].trim(), issuer);
+      const parties = [new URL(request.url).origin, ...csvSet(env.ALLOWED_ORIGINS)].map((o) => o.replace(/\/+$/, ''));
+      const claims = await verifyClerkToken(bearer[1].trim(), issuer, parties);
       const email: string | undefined =
         claims.email || claims.email_address || claims.primary_email_address || undefined;
-      const adminIds = csvList(env.ADMIN_USER_IDS);
-      const adminEmails = csvList(env.ADMIN_EMAILS);
-      const metaRole = claims.public_metadata?.role ?? claims.metadata?.role ?? claims.role;
-      const isAdminUser =
-        adminIds.includes(String(claims.sub).toLowerCase()) ||
-        (email ? adminEmails.includes(email.toLowerCase()) : false) ||
-        metaRole === 'admin';
+      // Administrador = SOLO el id de usuario de Clerk en ADMIN_USER_IDS. Ni correos ni metadatos ni "role":
+      // son valores que un usuario pueda llegar a controlar o que dependan de cómo se configure el token.
+      if (cleanEnv(env.ADMIN_EMAILS) && !adminEmailsWarned) {
+        adminEmailsWarned = true;
+        console.warn('[auth] ADMIN_EMAILS ya no concede acceso de administrador: usa ADMIN_USER_IDS y borra ADMIN_EMAILS.');
+      }
+      const isAdminUser = csvList(env.ADMIN_USER_IDS).includes(String(claims.sub).toLowerCase());
       return {
         role: isAdminUser ? 'admin' : 'user',
         userId: String(claims.sub),
@@ -268,18 +297,26 @@ async function resolveIdentity(request: Request, env: Env): Promise<Identity> {
     console.warn('Authorization recibido pero el Worker no tiene CLERK_PUBLISHABLE_KEY ni CLERK_ISSUER: se trata como anónimo.');
   }
 
+  // Anónimo: x-user-id es un SECRETO (como una contraseña). Se guarda solo su hash.
   const claimedId = request.headers.get('x-user-id') || '';
-  return {
-    role: 'anon',
-    userId: ANON_ID_RE.test(claimedId) ? claimedId : null,
-    authenticated: false,
-    authConfigured,
-  };
+  if (ANON_ID_RE.test(claimedId)) {
+    return {
+      role: 'anon',
+      userId: await anonOwnerKey(claimedId),
+      legacyUserId: cleanEnv(env.ALLOW_LEGACY_ANON_IDS).toLowerCase() === 'false' ? null : claimedId,
+      authenticated: false,
+      authConfigured,
+    };
+  }
+  return { role: 'anon', userId: null, authenticated: false, authConfigured };
 }
 
 function canManage(identity: Identity, ownerId: string | null | undefined): boolean {
   if (identity.role === 'admin') return true;
-  return Boolean(identity.userId && ownerId && identity.userId === ownerId);
+  if (!ownerId) return false;
+  if (identity.userId && identity.userId === ownerId) return true;
+  // Filas antiguas guardadas con el secreto en claro
+  return Boolean(identity.legacyUserId && identity.legacyUserId === ownerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +386,96 @@ async function ratePeek(
   }
 }
 
+/** Mira primero (solo lectura) y escribe solo si aún no se ha alcanzado el límite: lo bloqueado no genera escrituras. */
+async function rateGuard(
+  env: Env,
+  bucket: string,
+  limit: number,
+  windowSec: number
+): Promise<{ limited: boolean; retryAfter: number }> {
+  const peek = await ratePeek(env, bucket, limit, windowSec);
+  if (peek.limited) return peek;
+  return rateHit(env, bucket, limit, windowSec);
+}
+
+/** Presupuesto por ventana (p. ej. bytes subidos hoy): añade `amount` solo si no se supera `limit`. */
+async function rateBudget(
+  env: Env,
+  bucket: string,
+  amount: number,
+  limit: number,
+  windowSec: number
+): Promise<{ limited: boolean; retryAfter: number }> {
+  const { key, windowEnd, retryAfter } = windowKey(bucket, windowSec);
+  try {
+    await ensureRateTable(env);
+    const row = await env.DB.prepare('SELECT count FROM rate_limits WHERE key = ?').bind(key).first<any>();
+    if ((row?.count || 0) + amount > limit) return { limited: true, retryAfter };
+    await env.DB.prepare(
+      'INSERT INTO rate_limits (key, count, window_end) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET count = count + ?'
+    )
+      .bind(key, amount, windowEnd, amount)
+      .run();
+    return { limited: false, retryAfter };
+  } catch (err) {
+    console.error('rateBudget falló (se deja pasar):', err);
+    return { limited: false, retryAfter };
+  }
+}
+
+function mbEnv(v: string | undefined, def: number): number {
+  const n = parseFloat(cleanEnv(v));
+  return (Number.isFinite(n) && n > 0 ? n : def) * 1024 * 1024;
+}
+
+function quotaBytes(env: Env, role: Role): number {
+  return role === 'anon' ? mbEnv(env.QUOTA_ANON_MB, 5) : mbEnv(env.QUOTA_REGISTERED_MB, 100);
+}
+
+async function usedBytes(env: Env, identity: Identity): Promise<number> {
+  if (!identity.userId) return 0;
+  const row = await env.DB.prepare('SELECT COALESCE(SUM(size_bytes), 0) AS used FROM pages WHERE user_id = ? OR user_id = ?')
+    .bind(identity.userId, identity.legacyUserId || identity.userId)
+    .first<any>();
+  return row?.used || 0;
+}
+
+/**
+ * Cuota de almacenamiento del propietario. `delta` = bytes que se añaden (en una edición, nuevo − anterior).
+ * Para anónimos se suma un presupuesto diario por conexión, porque el identificador anónimo lo elige el
+ * cliente y, por sí solo, se esquivaría cambiándolo en cada petición.
+ */
+async function checkQuota(env: Env, identity: Identity, request: Request, delta: number): Promise<Response | null> {
+  if (identity.role === 'admin' || delta <= 0) return null;
+  const quota = quotaBytes(env, identity.role);
+  const used = await usedBytes(env, identity);
+  if (used + delta > quota) {
+    return jsonResponse(
+      {
+        error: `Has superado tu cuota de almacenamiento (${formatMB(used)} MB de ${formatMB(quota)} MB). Elimina páginas${identity.role === 'anon' ? ' o inicia sesión para tener más espacio' : ''}.`,
+        code: 'quota_exceeded',
+      },
+      413
+    );
+  }
+  if (identity.role === 'anon') {
+    const ipLimit = mbEnv(env.QUOTA_ANON_IP_DAILY_MB, 25);
+    const b = await rateBudget(env, `anonbytes:${clientIp(request)}`, delta, ipLimit, 86400);
+    if (b.limited) {
+      return tooManyRequests(
+        'Has alcanzado el límite diario de subida para tu conexión. Inicia sesión o inténtalo mañana.',
+        b.retryAfter
+      );
+    }
+  }
+  return null;
+}
+
+function readLimitPerMin(env: Env): number {
+  const n = parseInt(cleanEnv(env.READ_LIMIT_PER_MIN), 10);
+  return Number.isFinite(n) && n >= 0 ? n : 120;
+}
+
 function tooManyRequests(message: string, retryAfter: number): Response {
   return new Response(JSON.stringify({ error: message, retryAfterSeconds: retryAfter }), {
     status: 429,
@@ -368,6 +495,12 @@ const EDIT_LIMIT_ANON = 30; // ediciones por hora
 const EDIT_LIMIT_USER = 120;
 const UNLOCK_FAIL_LIMIT = 10; // contraseñas erróneas por IP+página cada 15 min
 const UNLOCK_WINDOW_SEC = 15 * 60;
+const UNLOCK_PAGE_FAIL_LIMIT = 100; // fallos por página y hora, sumando todas las IP (fuerza bruta distribuida)
+const UNLOCK_IP_FAIL_LIMIT = 60; // fallos por IP y 15 min en TODAS las páginas (barrido de páginas)
+const MIN_PASSWORD_LENGTH = 8;
+const PWD_CHANGE_LIMIT = 10; // cambios de contraseña por hora y usuario
+const MANAGE_LIMIT = 60; // prorrogar / borrar por hora y usuario
+const VIEW_DEDUPE_SEC = 3600; // una visita por IP y página cada hora
 
 async function purgeRateLimits(env: Env): Promise<void> {
   try {
@@ -380,16 +513,15 @@ async function purgeRateLimits(env: Env): Promise<void> {
   }
 }
 
-function mapPage(p: any) {
+/** includeOwner solo para administradores: nunca se exponen identificadores ni correos a otros usuarios. */
+function mapPage(p: any, includeOwner = false) {
   return {
     id: p.id,
     slug: p.slug,
     title: p.title,
     description: p.description,
     sizeBytes: p.size_bytes,
-    userId: p.user_id,
-    userEmail: p.user_email,
-    userRole: p.user_role,
+    ...(includeOwner ? { userId: p.user_id, userEmail: p.user_email, userRole: p.user_role } : {}),
     createdAt: p.created_at,
     updatedAt: p.updated_at,
     expiresAt: p.expires_at,
@@ -401,7 +533,7 @@ function mapPage(p: any) {
   };
 }
 
-function mapCollection(c: any) {
+function mapCollection(c: any, includeOwner = false) {
   let pageSlugs: string[] = [];
   try {
     pageSlugs = JSON.parse(c.page_slugs || '[]');
@@ -411,8 +543,7 @@ function mapCollection(c: any) {
     slug: c.slug,
     title: c.title,
     description: c.description,
-    userId: c.user_id,
-    userEmail: c.user_email,
+    ...(includeOwner ? { userId: c.user_id, userEmail: c.user_email } : {}),
     pageSlugs,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
@@ -560,12 +691,8 @@ async function servePreview(request: Request, env: Env, kind: 'p' | 'c', slug: s
       description = shortText(c.description, 200) || 'Colección de páginas HTML publicada con Crea URL.';
     }
 
-    const indexUrl = new URL('/index.html', url.origin).toString();
-    let indexRes = await env.ASSETS.fetch(new Request(indexUrl));
-    if (indexRes.status >= 300 && indexRes.status < 400) {
-      indexRes = await env.ASSETS.fetch(new Request(new URL('/', url.origin).toString()));
-    }
-    if (!indexRes.ok) return null;
+    const indexRes = await fetchSpaIndex(env, url.origin);
+    if (!indexRes) return null;
 
     const html = injectShareMeta(await indexRes.text(), {
       title,
@@ -611,7 +738,10 @@ async function ensureViewsTable(env: Env): Promise<void> {
   viewsTableReady = true;
 }
 
-async function recordView(env: Env, slug: string): Promise<void> {
+async function recordView(env: Env, slug: string, request: Request): Promise<void> {
+  // Una visita por IP y página cada hora: evita inflar contadores y escrituras repitiendo peticiones
+  const dedupe = await rateGuard(env, `view:${clientIp(request)}:${slug}`, 1, VIEW_DEDUPE_SEC);
+  if (dedupe.limited) return;
   const now = new Date();
   await env.DB.prepare('UPDATE pages SET views_count = views_count + 1, last_viewed_at = ? WHERE slug = ?')
     .bind(now.toISOString(), slug)
@@ -651,6 +781,18 @@ async function purgeOldViewStats(env: Env): Promise<void> {
   }
 }
 
+/** Error interno: el detalle va solo a los logs del Worker; el cliente recibe un mensaje genérico y una referencia. */
+function internalError(err: unknown, where: string): Response {
+  const ref = randomSlug(8);
+  console.error(`[${ref}] ${where}:`, err);
+  return jsonResponse(
+    { error: `Error interno del servidor. Si el problema persiste, indica esta referencia: ${ref}.`, ref },
+    500
+  );
+}
+
+const PROTECTED_TITLE = 'Página protegida';
+
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -681,6 +823,10 @@ function supabaseObjectUrl(env: Env, path: string): string {
     throw new Error(
       'SUPABASE_SERVICE_ROLE_KEY no definida en el Worker (Settings → Variables and Secrets, tipo Secret).'
     );
+  }
+  // Defensa en profundidad: solo nombres de archivo "slug.html" (nada de "../", barras ni caracteres raros)
+  if (!/^[a-z0-9_-]{1,64}\.html$/.test(path)) {
+    throw new Error('Ruta de almacenamiento no válida.');
   }
   const bucket = cleanEnv(env.SUPABASE_STORAGE_BUCKET) || 'html-pages';
   return `${base}/storage/v1/object/${bucket}/${path}`;
@@ -730,8 +876,189 @@ async function supabaseDelete(env: Env, slug: string): Promise<void> {
   }
 }
 
-export default {
+// ---------------------------------------------------------------------------
+// Cabeceras de seguridad, CSP y CORS (SEC-08, SEC-14)
+// ---------------------------------------------------------------------------
+const TRACKER_ORIGIN = 'https://aitors-hub-dashboard.asanchezgu.workers.dev';
+
+const BASE_SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
+  'Strict-Transport-Security': 'max-age=31536000',
+};
+
+async function sha256Base64(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return toBase64(new Uint8Array(buf));
+}
+
+/** Hashes de los <script> en línea ejecutables (no los src, ni JSON-LD) para permitirlos sin 'unsafe-inline'. */
+async function inlineScriptHashes(html: string): Promise<string[]> {
+  const out: string[] = [];
+  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const attrs = m[1] || '';
+    const body = m[2] || '';
+    if (/\bsrc\s*=/i.test(attrs) || /type\s*=\s*["']application\/ld\+json["']/i.test(attrs)) continue;
+    if (/type\s*=\s*["']module["']/i.test(attrs) && !body.trim()) continue;
+    if (!body.trim()) continue;
+    out.push(`'sha256-${await sha256Base64(body)}'`);
+  }
+  return out;
+}
+
+function csvSet(v: string | undefined): string[] {
+  return cleanEnv(v)
+    .split(/[\s,]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+async function buildCsp(env: Env, html: string): Promise<string> {
+  const clerk = clerkIssuer(env);
+  const clerkHosts = [clerk, 'https://*.clerk.accounts.dev'].filter(Boolean) as string[];
+  const extra = csvSet(env.CSP_EXTRA_SOURCES);
+  const hashes = await inlineScriptHashes(html);
+  const script = ["'self'", ...hashes, TRACKER_ORIGIN, ...clerkHosts, 'https://challenges.cloudflare.com', ...extra];
+  const connect = ["'self'", TRACKER_ORIGIN, ...clerkHosts, 'https://clerk-telemetry.com', ...extra];
+  return [
+    "default-src 'self'",
+    `script-src ${script.join(' ')}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https://img.clerk.com",
+    `connect-src ${connect.join(' ')}`,
+    "frame-src 'self' https://challenges.cloudflare.com",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    'report-uri /api/csp-report',
+  ].join('; ');
+}
+
+function originAllowed(origin: string, selfOrigin: string, env: Env): boolean {
+  if (origin === selfOrigin) return true;
+  return csvSet(env.ALLOWED_ORIGINS).includes(origin);
+}
+
+/** index.html de la SPA. Se pide "/" (200); "/index.html" puede redirigir a "/" en la plataforma real. */
+async function fetchSpaIndex(env: Env, origin: string): Promise<Response | null> {
+  if (!env.ASSETS) return null;
+  let res = await env.ASSETS.fetch(new Request(new URL('/', origin).toString()));
+  if (!res.ok) res = await env.ASSETS.fetch(new Request(new URL('/index.html', origin).toString()));
+  return res.ok ? res : null;
+}
+
+function isPreviewFramePath(path: string): boolean {
+  return path === '/preview-frame' || path === '/preview-frame.html';
+}
+
+async function withSecurityHeaders(request: Request, env: Env, res: Response): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const headers = new Headers(res.headers);
+  let body: BodyInit | null = res.body;
+
+  for (const [k, v] of Object.entries(BASE_SECURITY_HEADERS)) headers.set(k, v);
+
+  // CORS: solo el propio origen y los de ALLOWED_ORIGINS (antes era "*")
+  headers.delete('Access-Control-Allow-Origin');
+  const origin = request.headers.get('origin');
+  if (origin && originAllowed(origin, url.origin, env)) {
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.append('Vary', 'Origin');
+  } else {
+    headers.delete('Access-Control-Allow-Methods');
+    headers.delete('Access-Control-Allow-Headers');
+  }
+
+  const contentType = headers.get('content-type') || '';
+  if (path.startsWith('/api/')) {
+    if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'no-store');
+  } else if (isPreviewFramePath(path)) {
+    // Marco aislado para HTML de usuarios: origen opaco, sin acceso a la sesión de la aplicación
+    headers.set('Content-Security-Policy', 'sandbox allow-scripts allow-forms allow-modals allow-popups');
+    headers.set('X-Robots-Tag', 'noindex');
+  } else if (contentType.includes('text/html') && !path.startsWith('/raw/')) {
+    // Páginas de la aplicación (portada, /acerca-de, /p/..., /c/...)
+    const embeddable = /^\/(p|c)\//.test(path); // /p/ y /c/ se pueden incrustar (código «insertar» del cuadro de publicación)
+    if (embeddable && !headers.has('X-Robots-Tag')) headers.set('X-Robots-Tag', 'noindex'); // contenido de usuarios: no se indexa
+    const mode = cleanEnv(env.CSP_MODE).toLowerCase() || 'report-only';
+    const text = await res.text();
+    body = text;
+    headers.delete('content-length');
+    headers.delete('content-encoding');
+
+    if (!embeddable) {
+      headers.set('X-Frame-Options', 'SAMEORIGIN');
+    }
+    const ancestors = embeddable ? '' : "frame-ancestors 'self'";
+    if (mode === 'enforce') {
+      const csp = await buildCsp(env, text);
+      headers.set('Content-Security-Policy', ancestors ? `${csp}; ${ancestors}` : csp);
+    } else {
+      // frame-ancestors se ignora en Report-Only, así que va en una cabecera aparte siempre activa
+      if (ancestors) headers.set('Content-Security-Policy', ancestors);
+      if (mode !== 'off') headers.set('Content-Security-Policy-Report-Only', await buildCsp(env, text));
+    }
+  }
+
+  return new Response(body, { status: res.status, statusText: res.statusText, headers });
+}
+
+// Registro de informes CSP (con tope por minuto para no inundar los logs)
+let cspLogMinute = 0;
+let cspLogCount = 0;
+async function handleCspReport(request: Request): Promise<Response> {
+  const minute = Math.floor(Date.now() / 60000);
+  if (minute !== cspLogMinute) {
+    cspLogMinute = minute;
+    cspLogCount = 0;
+  }
+  if (cspLogCount < 30) {
+    try {
+      const raw: any = await request.json();
+      const list = Array.isArray(raw) ? raw.map((r: any) => r?.body || r) : [raw?.['csp-report'] || raw];
+      for (const r of list) {
+        const doc = String(r?.['document-uri'] || r?.documentURL || '');
+        if (/^(about|blob|data):/.test(doc)) continue; // ruido de documentos locales
+        cspLogCount++;
+        console.warn(
+          '[CSP]',
+          String(r?.['violated-directive'] || r?.effectiveDirective || '').slice(0, 60),
+          '| bloqueado:',
+          String(r?.['blocked-uri'] || r?.blockedURL || '').slice(0, 140),
+          '| en:',
+          doc.slice(0, 120)
+        );
+      }
+    } catch (_) {}
+  }
+  return new Response(null, { status: 204 });
+}
+
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
+    let res: Response;
+    try {
+      res = await worker.handle(request, env);
+    } catch (err) {
+      // URL con codificación inválida (p. ej. %E0%A4%A): es un error del cliente, no del servidor
+      res = err instanceof URIError ? jsonResponse({ error: 'Solicitud no válida.' }, 400) : internalError(err, 'fetch');
+    }
+    try {
+      return await withSecurityHeaders(request, env, res);
+    } catch (err) {
+      console.error('withSecurityHeaders falló:', err);
+      return res;
+    }
+  },
+
+  async handle(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -745,6 +1072,10 @@ export default {
       });
     }
 
+    if (path === '/api/csp-report' && request.method === 'POST') {
+      return handleCspReport(request);
+    }
+
     // Identidad verificada (solo en rutas de la API)
     let identity: Identity = { role: 'anon', userId: null, authenticated: false, authConfigured: false };
     if (path.startsWith('/api/')) {
@@ -756,6 +1087,16 @@ export default {
 
     // 1. Direct raw HTML serving: /raw/:slug
     if (path.startsWith('/raw/')) {
+      const readLimit = readLimitPerMin(env);
+      if (readLimit > 0) {
+        const rl = await rateGuard(env, `read:${clientIp(request)}`, readLimit, 60);
+        if (rl.limited) {
+          return new Response('Demasiadas peticiones. Inténtalo de nuevo en un minuto.', {
+            status: 429,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': String(rl.retryAfter) },
+          });
+        }
+      }
       const slug = path.replace('/raw/', '').split('/')[0];
       const pageResult = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
 
@@ -783,7 +1124,7 @@ export default {
         return new Response('Contenido HTML no encontrado en Supabase Storage.', { status: 404 });
       }
 
-      if (!isBot(request)) await recordView(env, slug);
+      if (!isBot(request)) await recordView(env, slug, request);
 
       return new Response(html, {
         headers: {
@@ -799,10 +1140,44 @@ export default {
     if (path === '/api/me' && request.method === 'GET') {
       return jsonResponse({
         role: identity.role,
-        userId: identity.userId,
+        userId: identity.authenticated ? identity.userId : null,
         email: identity.email || null,
         authenticated: identity.authenticated,
         authConfigured: identity.authConfigured,
+        storageConfigured: /^https?:\/\//i.test(cleanEnv(env.SUPABASE_URL)) && Boolean(cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)),
+      });
+    }
+
+    // POST /api/identity/rotate  (solo anónimos): cambia el secreto anónimo y traslada a él todo lo propio.
+    // Se usa para sustituir identificadores antiguos que llegaron a exponerse en la API pública.
+    if (path === '/api/identity/rotate' && request.method === 'POST') {
+      if (identity.role !== 'anon' || !identity.userId) {
+        return jsonResponse({ error: 'Solo se puede rotar una identidad anónima.' }, 400);
+      }
+      const rl = await rateHit(env, `rotate:ip:${clientIp(request)}`, 10, 3600);
+      if (rl.limited) {
+        return tooManyRequests('Demasiados intentos. Inténtalo más tarde.', rl.retryAfter);
+      }
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch (_) {}
+      const newId = typeof body?.newId === 'string' ? body.newId : '';
+      if (!ANON_ID_RE.test(newId) || newId.length < 20 || newId === request.headers.get('x-user-id')) {
+        return jsonResponse({ error: 'Identificador nuevo no válido.' }, 400);
+      }
+      const newKey = await anonOwnerKey(newId);
+      const oldRaw = identity.legacyUserId || identity.userId;
+      const resPages = await env.DB.prepare('UPDATE pages SET user_id = ? WHERE user_id = ? OR user_id = ?')
+        .bind(newKey, identity.userId, oldRaw)
+        .run();
+      const resCols = await env.DB.prepare('UPDATE collections SET user_id = ? WHERE user_id = ? OR user_id = ?')
+        .bind(newKey, identity.userId, oldRaw)
+        .run();
+      return jsonResponse({
+        success: true,
+        migratedPages: resPages?.meta?.changes ?? null,
+        migratedCollections: resCols?.meta?.changes ?? null,
       });
     }
 
@@ -818,31 +1193,14 @@ export default {
         results = res.results || [];
       } else if (userId) {
         const res = await env.DB.prepare(
-          'SELECT * FROM pages WHERE user_id = ? ORDER BY created_at DESC'
+          'SELECT * FROM pages WHERE user_id = ? OR user_id = ? ORDER BY created_at DESC'
         )
-          .bind(userId)
+          .bind(userId, identity.legacyUserId || userId)
           .all<any>();
         results = res.results || [];
       }
 
-      const sanitized = results.map((p) => ({
-        id: p.id,
-        slug: p.slug,
-        title: p.title,
-        description: p.description,
-        sizeBytes: p.size_bytes,
-        userId: p.user_id,
-        userEmail: p.user_email,
-        userRole: p.user_role,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-        expiresAt: p.expires_at,
-        isEphemeral: !!p.is_ephemeral,
-        hasPassword: !!p.has_password,
-        viewsCount: p.views_count,
-        lastViewedAt: p.last_viewed_at,
-        collectionId: p.collection_id,
-      }));
+      const sanitized = results.map((p) => mapPage(p, userRole === 'admin'));
 
       return jsonResponse({ pages: sanitized });
     }
@@ -915,9 +1273,12 @@ export default {
           if (userRole === 'anon' && password.trim().length > 0) {
             return jsonResponse({ error: 'Proteger con contraseña requiere una cuenta gratuita.' }, 403);
           }
+          if (password.trim().length > 0 && password.trim().length < MIN_PASSWORD_LENGTH) {
+            return jsonResponse({ error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` }, 400);
+          }
         }
 
-        const userId = identity.userId || `anon_${randomSlug(8)}`;
+        const userId = identity.userId || `anonh_${randomSlug(16)}`;
         const userEmail = identity.email || undefined;
 
         // Slug: personalizado (3-40 caracteres) o aleatorio
@@ -952,6 +1313,10 @@ export default {
             return jsonResponse({ error: 'No se pudo generar un slug único. Inténtalo de nuevo.' }, 500);
           }
         }
+
+        // Cuota de almacenamiento del propietario
+        const quotaError = await checkQuota(env, identity, request, sizeBytes);
+        if (quotaError) return quotaError;
 
         // Si se publica dentro de una colección, debe ser del propio usuario
         if (collectionId) {
@@ -1028,8 +1393,6 @@ export default {
               title: title || `Página ${slug}`,
               description,
               sizeBytes,
-              userId,
-              userRole,
               createdAt: now.toISOString(),
               expiresAt: expiresAt.toISOString(),
               hasPassword,
@@ -1041,13 +1404,20 @@ export default {
           201
         );
       } catch (err: any) {
-        return jsonResponse({ error: err.message }, 500);
+        return internalError(err, 'POST /api/pages');
       }
     }
 
     // GET /api/pages/:slug
     const pageMatch = path.match(/^\/api\/pages\/([^/]+)$/);
     if (pageMatch && request.method === 'GET') {
+      const readLimit = readLimitPerMin(env);
+      if (readLimit > 0) {
+        const rl = await rateGuard(env, `read:${clientIp(request)}`, readLimit, 60);
+        if (rl.limited) {
+          return tooManyRequests('Demasiadas peticiones. Inténtalo de nuevo en un minuto.', rl.retryAfter);
+        }
+      }
       const slug = decodeURIComponent(pageMatch[1]);
       const p = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(slug).first<any>();
       if (!p) return jsonResponse({ error: 'Página no encontrada' }, 404);
@@ -1059,20 +1429,21 @@ export default {
       if (!p.has_password) {
         html = (await supabaseDownload(env, slug)) || undefined;
         if (html !== undefined && !isBot(request)) {
-          await recordView(env, slug);
+          await recordView(env, slug, request);
           p.views_count = (p.views_count || 0) + 1;
         }
       }
+
+      // Una página con contraseña no revela su título ni su descripción a quien no la gestiona
+      const hideMeta = !!p.has_password && !canManage(identity, p.user_id);
 
       return jsonResponse({
         page: {
           id: p.id,
           slug: p.slug,
-          title: p.title,
-          description: p.description,
+          title: hideMeta ? PROTECTED_TITLE : p.title,
+          description: hideMeta ? '' : p.description,
           sizeBytes: p.size_bytes,
-          userId: p.user_id,
-          userRole: p.user_role,
           createdAt: p.created_at,
           expiresAt: p.expires_at,
           isEphemeral: !!p.is_ephemeral,
@@ -1152,7 +1523,7 @@ export default {
       }
       const html = await supabaseDownload(env, slug);
       if (html === null) return jsonResponse({ error: 'Contenido no encontrado en Supabase Storage.' }, 404);
-      return jsonResponse({ page: mapPage(p), html });
+      return jsonResponse({ page: mapPage(p, identity.role === 'admin'), html });
     }
 
     // PUT /api/pages/:slug  (solo propietario o admin): actualiza contenido, título y descripción
@@ -1228,6 +1599,8 @@ export default {
               413
             );
           }
+          const quotaError = await checkQuota(env, identity, request, sizeBytes - (p.size_bytes || 0));
+          if (quotaError) return quotaError;
           updates.html = body.html;
           updates.sizeBytes = sizeBytes;
         }
@@ -1250,10 +1623,10 @@ export default {
             description: updates.description,
             size_bytes: updates.sizeBytes,
             updated_at: nowIso,
-          }),
+          }, identity.role === 'admin'),
         });
       } catch (err: any) {
-        return jsonResponse({ error: err.message }, 500);
+        return internalError(err, 'PUT /api/pages/:slug');
       }
     }
 
@@ -1265,6 +1638,10 @@ export default {
 
       if (!canManage(identity, p.user_id)) {
         return jsonResponse({ error: 'No tienes permiso para eliminar esta página.' }, 403);
+      }
+      if (identity.role !== 'admin') {
+        const rl = await rateGuard(env, `manage:${identity.userId}`, MANAGE_LIMIT, 3600);
+        if (rl.limited) return tooManyRequests('Demasiadas operaciones seguidas. Inténtalo más tarde.', rl.retryAfter);
       }
 
       try {
@@ -1289,12 +1666,20 @@ export default {
           return jsonResponse({ error: 'Esta página ha expirado.' }, 410);
         }
         if (p.has_password) {
-          const attemptBucket = `unlock:${clientIp(request)}:${slug}`;
-          const peek = await ratePeek(env, attemptBucket, UNLOCK_FAIL_LIMIT, UNLOCK_WINDOW_SEC);
-          if (peek.limited) {
+          const ip = clientIp(request);
+          const attemptBucket = `unlock:${ip}:${slug}`; // fallos de esta IP en esta página
+          const pageBucket = `unlockpage:${slug}`; // fallos en esta página, sumando todas las IP
+          const ipBucket = `unlockip:${ip}`; // fallos de esta IP en cualquier página
+          const peeks = [
+            await ratePeek(env, attemptBucket, UNLOCK_FAIL_LIMIT, UNLOCK_WINDOW_SEC),
+            await ratePeek(env, pageBucket, UNLOCK_PAGE_FAIL_LIMIT, 3600),
+            await ratePeek(env, ipBucket, UNLOCK_IP_FAIL_LIMIT, UNLOCK_WINDOW_SEC),
+          ];
+          const blocked = peeks.find((x) => x.limited);
+          if (blocked) {
             return tooManyRequests(
-              `Demasiados intentos fallidos. Inténtalo de nuevo en ${Math.ceil(peek.retryAfter / 60)} min.`,
-              peek.retryAfter
+              `Demasiados intentos fallidos. Inténtalo de nuevo en ${Math.ceil(blocked.retryAfter / 60)} min.`,
+              blocked.retryAfter
             );
           }
           const supplied = typeof body.password === 'string' ? body.password : '';
@@ -1303,6 +1688,8 @@ export default {
             : { ok: false, needsUpgrade: false };
           if (!check.ok) {
             await rateHit(env, attemptBucket, UNLOCK_FAIL_LIMIT, UNLOCK_WINDOW_SEC);
+            await rateHit(env, pageBucket, UNLOCK_PAGE_FAIL_LIMIT, 3600);
+            await rateHit(env, ipBucket, UNLOCK_IP_FAIL_LIMIT, UNLOCK_WINDOW_SEC);
             return jsonResponse({ error: 'Contraseña incorrecta. Acceso denegado.' }, 401);
           }
           if (check.needsUpgrade) {
@@ -1318,10 +1705,10 @@ export default {
         }
         const html = await supabaseDownload(env, slug);
         if (html === null) return jsonResponse({ error: 'Contenido no encontrado en Supabase Storage.' }, 404);
-        await recordView(env, slug);
+        await recordView(env, slug, request);
         return jsonResponse({ success: true, html });
       } catch (err: any) {
-        return jsonResponse({ error: err.message }, 500);
+        return internalError(err, 'POST /api/pages/:slug/unlock');
       }
     }
 
@@ -1334,13 +1721,17 @@ export default {
       if (!canManage(identity, p.user_id)) {
         return jsonResponse({ error: 'No tienes permiso para modificar esta página.' }, 403);
       }
+      if (identity.role !== 'admin') {
+        const rl = await rateGuard(env, `manage:${identity.userId}`, MANAGE_LIMIT, 3600);
+        if (rl.limited) return tooManyRequests('Demasiadas operaciones seguidas. Inténtalo más tarde.', rl.retryAfter);
+      }
       const base = Math.max(Date.now(), new Date(p.expires_at).getTime());
       const newExpiry = new Date(base + 90 * 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
       await env.DB.prepare('UPDATE pages SET expires_at = ?, updated_at = ? WHERE slug = ?')
         .bind(newExpiry, nowIso, slug)
         .run();
-      return jsonResponse({ success: true, page: mapPage({ ...p, expires_at: newExpiry, updated_at: nowIso }) });
+      return jsonResponse({ success: true, page: mapPage({ ...p, expires_at: newExpiry, updated_at: nowIso }, identity.role === 'admin') });
     }
 
     // PATCH /api/pages/:slug/password
@@ -1360,12 +1751,24 @@ export default {
       if (has && String(body.password).length > MAX_PASSWORD_LENGTH) {
         return jsonResponse({ error: `La contraseña no puede superar los ${MAX_PASSWORD_LENGTH} caracteres.` }, 400);
       }
+      if (has && String(body.password).trim().length < MIN_PASSWORD_LENGTH) {
+        return jsonResponse({ error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` }, 400);
+      }
+      if (identity.role !== 'admin') {
+        const rl = await rateGuard(env, `pwdchange:${identity.userId}`, PWD_CHANGE_LIMIT, 3600);
+        if (rl.limited) {
+          return tooManyRequests(
+            `Has cambiado la contraseña demasiadas veces. Inténtalo de nuevo en ${Math.ceil(rl.retryAfter / 60)} min.`,
+            rl.retryAfter
+          );
+        }
+      }
       const hash = has ? await hashPassword(String(body.password).trim(), env) : null;
       const nowIso = new Date().toISOString();
       await env.DB.prepare('UPDATE pages SET has_password = ?, password_hash = ?, updated_at = ? WHERE slug = ?')
         .bind(has ? 1 : 0, hash, nowIso, slug)
         .run();
-      return jsonResponse({ success: true, page: mapPage({ ...p, has_password: has ? 1 : 0, updated_at: nowIso }) });
+      return jsonResponse({ success: true, page: mapPage({ ...p, has_password: has ? 1 : 0, updated_at: nowIso }, identity.role === 'admin') });
     }
 
     // --- Collections ---
@@ -1377,11 +1780,11 @@ export default {
         rows = (await env.DB.prepare('SELECT * FROM collections ORDER BY created_at DESC').bind().all<any>()).results || [];
       } else if (userId) {
         rows =
-          (await env.DB.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY created_at DESC')
-            .bind(userId)
+          (await env.DB.prepare('SELECT * FROM collections WHERE user_id = ? OR user_id = ? ORDER BY created_at DESC')
+            .bind(userId, identity.legacyUserId || userId)
             .all<any>()).results || [];
       }
-      return jsonResponse({ collections: rows.map(mapCollection) });
+      return jsonResponse({ collections: rows.map((c) => mapCollection(c, userRole === 'admin')) });
     }
 
     if (path === '/api/collections' && request.method === 'POST') {
@@ -1401,7 +1804,7 @@ export default {
             );
           }
         }
-        const userId = identity.userId || `anon_${randomSlug(8)}`;
+        const userId = identity.userId || `anonh_${randomSlug(16)}`;
         const userEmail = identity.email || null;
         const slug =
           customSlug && String(customSlug).trim()
@@ -1422,12 +1825,12 @@ export default {
         return jsonResponse(
           {
             success: true,
-            collection: { id, slug, title: String(title).trim(), description: String(description).trim(), userId, userEmail, pageSlugs: slugs, createdAt: nowIso, updatedAt: nowIso },
+            collection: { id, slug, title: String(title).trim(), description: String(description).trim(), pageSlugs: slugs, createdAt: nowIso, updatedAt: nowIso },
           },
           201
         );
       } catch (err: any) {
-        return jsonResponse({ error: err.message }, 500);
+        return internalError(err, 'POST /api/collections');
       }
     }
 
@@ -1436,11 +1839,18 @@ export default {
       const slug = decodeURIComponent(colMatch[1]);
       const c = await env.DB.prepare('SELECT * FROM collections WHERE slug = ?').bind(slug).first<any>();
       if (!c) return jsonResponse({ error: 'Colección no encontrada' }, 404);
-      const col = mapCollection(c);
+      const col = mapCollection(c, identity.role === 'admin');
       const pages: any[] = [];
       for (const ps of col.pageSlugs) {
         const row = await env.DB.prepare('SELECT * FROM pages WHERE slug = ?').bind(ps).first<any>();
-        if (row) pages.push(mapPage(row));
+        if (row) {
+          const item: any = mapPage(row, identity.role === 'admin');
+          if (row.has_password && !canManage(identity, row.user_id)) {
+            item.title = PROTECTED_TITLE;
+            item.description = '';
+          }
+          pages.push(item);
+        }
       }
       return jsonResponse({ collection: col, pages });
     }
@@ -1498,7 +1908,7 @@ export default {
           remainingPages: left?.n || 0,
         });
       } catch (err: any) {
-        return jsonResponse({ error: err.message }, 500);
+        return internalError(err, 'POST /api/admin/purge-expired');
       }
     }
 
@@ -1521,15 +1931,13 @@ export default {
       const lastSegment = path.split('/').pop() || '';
       const looksLikeFile = lastSegment.includes('.'); // /assets/x.js, /favicon.ico...: un 404 real, no una ruta de la SPA
       if (assetRes.status === 404 && request.method === 'GET' && !path.startsWith('/api/') && !looksLikeFile) {
-        const indexReq = new Request(new URL('/index.html', url.origin).toString(), request);
-        const spaRes = await env.ASSETS.fetch(indexReq);
-        // Rutas de páginas/colecciones que no existen (o caducadas): que no se indexen
-        if (/^\/(p|c)\//.test(path)) {
+        const spaRes = await fetchSpaIndex(env, url.origin);
+        if (spaRes) {
+          // Rutas de páginas/colecciones que no existen (o caducadas): que no se indexen
           const headers = new Headers(spaRes.headers);
-          headers.set('X-Robots-Tag', 'noindex');
-          return new Response(spaRes.body, { status: spaRes.status, headers });
+          if (/^\/(p|c)\//.test(path)) headers.set('X-Robots-Tag', 'noindex');
+          return new Response(spaRes.body, { status: 200, headers });
         }
-        return spaRes;
       }
       return assetRes;
     }
@@ -1548,3 +1956,5 @@ export default {
     }
   },
 };
+
+export default worker;

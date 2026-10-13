@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
+import { SandboxedFrame } from './SandboxedFrame';
 import { 
   Monitor, 
   Tablet, 
@@ -19,7 +20,6 @@ export const PreviewZone: React.FC<PreviewZoneProps> = ({ html, onOpenTemplates 
   const [device, setDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [isSandboxNoticeOpen, setIsSandboxNoticeOpen] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const reloadIframe = () => {
     setIframeKey((prev) => prev + 1);
@@ -27,9 +27,19 @@ export const PreviewZone: React.FC<PreviewZoneProps> = ({ html, onOpenTemplates 
 
   const openInNewTab = () => {
     if (!html) return;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    // NUNCA con un blob: heredaría el origen de la aplicación y el HTML del usuario podría leer su sesión.
+    // /preview-frame se sirve con CSP "sandbox" (origen opaco) y recibe el HTML por mensaje.
+    const win = window.open('/preview-frame', '_blank');
+    if (!win) return;
+    let sent = false;
+    const onMessage = (e: MessageEvent) => {
+      if (sent || e.source !== win || !e.data || e.data.type !== 'creaurl-ready') return;
+      sent = true;
+      win.postMessage({ type: 'creaurl-render', html }, '*');
+      window.removeEventListener('message', onMessage);
+    };
+    window.addEventListener('message', onMessage);
+    window.setTimeout(() => window.removeEventListener('message', onMessage), 15000);
   };
 
   const getContainerWidth = () => {
@@ -138,12 +148,10 @@ export const PreviewZone: React.FC<PreviewZoneProps> = ({ html, onOpenTemplates 
           <div
             className={`h-full transition-all duration-300 flex flex-col bg-white rounded-lg shadow-xl overflow-hidden border border-slate-800 ${getContainerWidth()}`}
           >
-            <iframe
-              key={iframeKey}
-              ref={iframeRef}
+            <SandboxedFrame
+              html={html}
+              reloadToken={iframeKey}
               title="Previsualización HTML Sandboxed"
-              srcDoc={html}
-              sandbox="allow-scripts allow-forms allow-modals allow-popups"
               className="w-full h-full border-0 bg-white"
             />
           </div>

@@ -433,10 +433,16 @@ export const EditorZone: React.FC<EditorZoneProps> = ({
                 placeholder={
                   currentUser.role === 'anon'
                     ? 'Inicia sesión para proteger con clave'
-                    : 'Introduce contraseña de acceso...'
+                    : 'Mínimo 8 caracteres...'
                 }
+                autoComplete="new-password"
                 className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-2.5 py-1 text-xs text-strong outline-none"
               />
+              {currentUser.role !== 'anon' && password.trim().length > 0 && password.trim().length < 8 && (
+                <p className="mt-1 text-[10px] text-rose-400" role="alert">
+                  La contraseña debe tener al menos 8 caracteres.
+                </p>
+              )}
             </div>
 
             {/* Ephemeral Mode Toggle */}

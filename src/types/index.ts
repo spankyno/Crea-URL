@@ -15,9 +15,10 @@ export interface PageItem {
   title: string;
   description?: string;
   sizeBytes: number;
-  userId: string;
+  // Solo los administradores reciben estos datos del propietario
+  userId?: string;
   userEmail?: string;
-  userRole: UserRole;
+  userRole?: UserRole;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -48,7 +49,7 @@ export interface CollectionItem {
   slug: string;
   title: string;
   description: string;
-  userId: string;
+  userId?: string;
   userEmail?: string;
   pageSlugs: string[];
   createdAt: string;

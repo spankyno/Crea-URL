@@ -10,6 +10,18 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
+// ⚠ SERVIDOR SOLO PARA DESARROLLO LOCAL ⚠
+// Confía ciegamente en las cabeceras x-user-role / x-user-id enviadas por el cliente (cualquiera puede ser
+// administrador) y no verifica sesiones. La aplicación de producción es el Worker de Cloudflare
+// (deploy/cloudflare-worker.ts), que sí verifica los tokens de Clerk. NO despliegues este archivo.
+if (IS_PRODUCTION && process.env.ALLOW_INSECURE_DEV_SERVER !== '1') {
+  console.error('❌ server.ts es solo para desarrollo local y no es seguro en producción (se niega a arrancar con NODE_ENV=production).');
+  console.error('   Producción: npm run deploy (Worker de Cloudflare). Si de verdad lo necesitas, define ALLOW_INSECURE_DEV_SERVER=1.');
+  process.exit(1);
+}
+// Solo accesible desde este equipo, no desde la red (cámbialo con HOST solo si sabes lo que haces)
+const HOST = process.env.HOST || '127.0.0.1';
+
 // Storage directories
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const STORAGE_DIR = path.resolve(DATA_DIR, 'storage');
@@ -662,10 +674,9 @@ app.delete('/api/collections/:slug', (req: Request, res: Response) => {
 // 13. GET /api/admin/stats
 app.get('/api/admin/stats', (req: Request, res: Response) => {
   const userRole = (req.headers['x-user-role'] as string) || 'anon';
-  const adminKey = req.headers['x-admin-key'] as string;
 
   // Verify admin access
-  if (userRole !== 'admin' && adminKey !== 'admin-secret-creaurl') {
+  if (userRole !== 'admin') {
     res.status(403).json({ error: 'Acceso no autorizado al panel de administración.' });
     return;
   }
@@ -695,9 +706,8 @@ app.get('/api/admin/stats', (req: Request, res: Response) => {
 // 14. POST /api/admin/purge-expired
 app.post('/api/admin/purge-expired', (req: Request, res: Response) => {
   const userRole = (req.headers['x-user-role'] as string) || 'anon';
-  const adminKey = req.headers['x-admin-key'] as string;
 
-  if (userRole !== 'admin' && adminKey !== 'admin-secret-creaurl') {
+  if (userRole !== 'admin') {
     res.status(403).json({ error: 'Acceso denegado.' });
     return;
   }
@@ -884,8 +894,8 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Crea URL Server running at http://0.0.0.0:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`🚀 Crea URL (servidor de DESARROLLO, sin autenticación real) en http://${HOST}:${PORT}`);
   });
 }
 
