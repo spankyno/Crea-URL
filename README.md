@@ -47,3 +47,10 @@ wrangler deploy --config deploy/wrangler.toml
 ```
 
 > ⚡ **Nota de Solución POST 405**: Se ha añadido `run_worker_first = true` en `deploy/wrangler.toml` para solucionar el error `405 Method Not Allowed` en `/api/pages` al publicar desde Cloudflare Workers.
+
+## Pruebas
+
+```bash
+npm run test:e2e   # Worker real en workerd + D1 real; ver tests/e2e/README.md
+npm run lint       # comprobación de tipos
+```

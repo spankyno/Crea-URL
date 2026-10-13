@@ -1,0 +1,14 @@
+{
+  "name": "Crea URL",
+  "short_name": "Crea URL",
+  "description": "Publica páginas HTML gratis con URL pública, código QR y colecciones.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

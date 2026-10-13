@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <title>Vista previa</title>
+</head>
+<body>
+  <!--
+    Marco aislado para mostrar HTML de usuarios (vista previa, páginas publicadas y "abrir en pestaña nueva").
+    Se sirve con "Content-Security-Policy: sandbox allow-scripts ...": SIN allow-same-origin, así que el
+    contenido tiene un origen opaco y no puede leer el almacenamiento ni la sesión de la aplicación.
+    Recibe el HTML por postMessage del documento que lo abre (la aplicación) y lo escribe aquí.
+  -->
+  <script>
+    (function () {
+      // Cinturón y tirantes: si por un error de configuración esta página se sirviera SIN aislamiento
+      // (origen real en vez de opaco), se niega a ejecutar nada.
+      if (window.origin !== 'null') {
+        document.body.textContent = 'Vista previa no disponible: falta el aislamiento (sandbox).';
+        return;
+      }
+      var host = window.parent !== window ? window.parent : window.opener;
+      if (!host) return;
+      window.addEventListener('message', function (e) {
+        if (e.source !== host) return;
+        var d = e.data;
+        if (!d || d.type !== 'creaurl-render' || typeof d.html !== 'string') return;
+        document.open();
+        document.write(d.html);
+        document.close();
+      });
+      host.postMessage({ type: 'creaurl-ready' }, '*');
+    })();
+  </script>
+</body>
+</html>

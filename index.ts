@@ -1,0 +1,128 @@
+export type UserRole = 'anon' | 'user' | 'admin';
+
+export interface UserSession {
+  id: string;
+  email?: string;
+  name: string;
+  role: UserRole;
+  isRegistered: boolean;
+  avatarUrl?: string;
+}
+
+export interface PageItem {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string;
+  sizeBytes: number;
+  // Solo los administradores reciben estos datos del propietario
+  userId?: string;
+  userEmail?: string;
+  userRole?: UserRole;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  isEphemeral: boolean;
+  hasPassword: boolean;
+  viewsCount: number;
+  lastViewedAt?: string;
+  collectionId?: string;
+}
+
+export interface PageStats {
+  slug: string;
+  title: string;
+  days: number;
+  series: { day: string; views: number }[];
+  totalViews: number;
+  viewsInRange: number;
+  viewsLast7: number;
+  viewsToday: number;
+  bestDay: { day: string; views: number } | null;
+  lastViewedAt: string | null;
+  createdAt: string;
+  viewsBeforeTracking: number;
+}
+
+export interface CollectionItem {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  userId?: string;
+  userEmail?: string;
+  pageSlugs: string[];
+  createdAt: string;
+  updatedAt: string;
+  pages?: PageItem[];
+}
+
+export interface PublishRequest {
+  html: string;
+  title: string;
+  description?: string;
+  customSlug?: string;
+  password?: string;
+  isEphemeral?: boolean;
+  collectionId?: string;
+}
+
+export interface AdminStats {
+  totalPages: number;
+  totalViews: number;
+  totalSizeBytes: number;
+  activePages: number;
+  expiredPages: number;
+  passwordProtectedPages: number;
+  ephemeralPages: number;
+  totalCollections: number;
+  openReports?: number;
+  storageDirectory?: string;
+}
+
+export type ReportReason = 'phishing' | 'malware' | 'ilegal' | 'derechos' | 'otro';
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  phishing: 'Suplantación o phishing',
+  malware: 'Malware o contenido dañino',
+  ilegal: 'Contenido ilegal',
+  derechos: 'Derechos de autor o privacidad',
+  otro: 'Otro motivo',
+};
+
+export interface ReportItem {
+  id: string;
+  slug: string;
+  reason: ReportReason;
+  details: string;
+  contact: string;
+  createdAt: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  resolvedAt: string | null;
+  pageTitle: string | null;
+  pageExists: boolean;
+}
+
+export interface HtmlValidationResult {
+  isValid: boolean;
+  hasDoctype: boolean;
+  hasHtmlTag: boolean;
+  hasBodyTag: boolean;
+  hasHeadTag: boolean;
+  warnings: string[];
+  errors: string[];
+  tagStats: {
+    scripts: number;
+    styles: number;
+    images: number;
+    links: number;
+    totalElements: number;
+  };
+}
+
+export interface StarterTemplate {
+  id: string;
+  name: string;
+  description: string;
+  html: string;
+}

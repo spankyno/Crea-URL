@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+# Las páginas de usuarios (/p/, /c/, /raw/) son rastreables pero llevan "noindex"
+# (meta robots / cabecera X-Robots-Tag), así que no aparecen en los resultados de búsqueda.
+
+Sitemap: https://crea-url.kbo1.workers.dev/sitemap.xml

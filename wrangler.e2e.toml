@@ -1,0 +1,19 @@
+# Configuración SOLO para las pruebas de extremo a extremo (tests/e2e/run.mjs).
+# Vive aquí para que wrangler busque el archivo .dev.vars junto a ella: así el .dev.vars real de tu proyecto
+# (con tus secretos) queda totalmente ignorado, y la base de datos local de las pruebas está aislada.
+name = "crea-url-e2e"
+main = "../../deploy/cloudflare-worker.ts"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "../../dist"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "crea_url_db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+SUPABASE_STORAGE_BUCKET = "html-pages"
