@@ -20,4 +20,10 @@
       <image:title>Acerca de Crea URL</image:title>
     </image:image>
   </url>
+  <url>
+    <loc>https://crea-url.kbo1.workers.dev/privacidad</loc>
+    <lastmod>2026-10-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
 </urlset>

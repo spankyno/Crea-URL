@@ -206,8 +206,12 @@
 }
   </script>
 
-  <!-- Seguimiento (Aitor's Hub Dashboard) -->
-  <script src="https://aitors-hub-dashboard.asanchezgu.workers.dev/tracker.js" data-app="crea-url" data-key="ak_53d35ba2f3234730ad06768268816a0a" async></script>
+  <!--tracker:start-->
+  <!-- Analítica propia (Aitor's Hub Dashboard): /analytics.js es una copia fija y revisada del script de seguimiento,
+       servida desde este mismo origen. Solo envía la aplicación y la ruta de la página visitada (sin cookies ni
+       almacenamiento). TRACKER_ENABLED=false en Cloudflare lo retira de todas las páginas. -->
+  <script src="/analytics.js" data-app="crea-url" data-key="ak_53d35ba2f3234730ad06768268816a0a" async></script>
+  <!--tracker:end-->
   <style>
     :root {
       color-scheme: dark;
@@ -445,6 +449,7 @@
       <p style="margin:0 0 6px">Crea URL © 2026 · Autor: Aitor Sánchez Gutiérrez</p>
       <p class="foot-links">
         <a href="/">Volver a Crea URL</a>
+        <a href="/privacidad">Privacidad y normas</a>
         <a href="https://aitorsanchez.pages.dev" target="_blank" rel="noopener noreferrer">Blog</a>
         <a href="https://aitorhub.vercel.app" target="_blank" rel="noopener noreferrer">Aitor Hub</a>
         <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">Contacto</a>

@@ -42,6 +42,8 @@ export interface Env {
   ADMIN_EMAILS?: string; // OBSOLETO: ya no concede acceso de administrador (solo ADMIN_USER_IDS)
   // Identidades anónimas antiguas (sin hash): "false" desactiva la compatibilidad cuando ya no queden
   ALLOW_LEGACY_ANON_IDS?: string;
+  // Seguimiento (Aitor's Hub Dashboard): "false" lo retira de todas las páginas al instante (interruptor de emergencia)
+  TRACKER_ENABLED?: string;
   // Seguridad de la aplicación (opcionales)
   CSP_MODE?: string; // "report-only" (por defecto) | "enforce" | "off"
   ALLOWED_ORIGINS?: string; // orígenes con acceso CORS a la API, separados por comas (además del propio)
@@ -758,6 +760,35 @@ async function recordView(env: Env, slug: string, request: Request): Promise<voi
   }
 }
 
+// ---------------------------------------------------------------------------
+// Denuncias de páginas (SEC-03). La tabla se crea sola la primera vez.
+// ---------------------------------------------------------------------------
+let reportsTableReady = false;
+const REPORT_REASONS = ['phishing', 'malware', 'ilegal', 'derechos', 'otro'];
+const REPORT_LIMIT_PER_HOUR = 5; // por IP
+const REPORT_RETENTION_DAYS = 90; // las ya resueltas o descartadas
+
+async function ensureReportsTable(env: Env): Promise<void> {
+  if (reportsTableReady) return;
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, slug TEXT NOT NULL, reason TEXT NOT NULL, details TEXT, contact TEXT, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', resolved_at TEXT)"
+  )
+    .bind()
+    .run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at)').bind().run();
+  reportsTableReady = true;
+}
+
+async function purgeOldReports(env: Env): Promise<void> {
+  try {
+    await ensureReportsTable(env);
+    const cutoff = new Date(Date.now() - REPORT_RETENTION_DAYS * 86400000).toISOString();
+    await env.DB.prepare("DELETE FROM reports WHERE status != 'open' AND resolved_at < ?").bind(cutoff).run();
+  } catch (err) {
+    console.error('purgeOldReports falló:', err);
+  }
+}
+
 async function deleteViewStats(env: Env, slugs: string[]): Promise<void> {
   if (slugs.length === 0) return;
   try {
@@ -879,6 +910,7 @@ async function supabaseDelete(env: Env, slug: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Cabeceras de seguridad, CSP y CORS (SEC-08, SEC-14)
 // ---------------------------------------------------------------------------
+// Destino de las visitas (Aitor's Hub Dashboard). El script en sí es propio: public/analytics.js
 const TRACKER_ORIGIN = 'https://aitors-hub-dashboard.asanchezgu.workers.dev';
 
 const BASE_SECURITY_HEADERS: Record<string, string> = {
@@ -916,13 +948,17 @@ function csvSet(v: string | undefined): string[] {
     .filter(Boolean);
 }
 
-async function buildCsp(env: Env, html: string): Promise<string> {
+async function buildCsp(env: Env, html: string, trackerEnabled = true): Promise<string> {
   const clerk = clerkIssuer(env);
   const clerkHosts = [clerk, 'https://*.clerk.accounts.dev'].filter(Boolean) as string[];
   const extra = csvSet(env.CSP_EXTRA_SOURCES);
   const hashes = await inlineScriptHashes(html);
-  const script = ["'self'", ...hashes, TRACKER_ORIGIN, ...clerkHosts, 'https://challenges.cloudflare.com', ...extra];
-  const connect = ["'self'", TRACKER_ORIGIN, ...clerkHosts, 'https://clerk-telemetry.com', ...extra];
+  const tracker = trackerEnabled ? [TRACKER_ORIGIN] : [];
+  // El script de analítica es una copia propia (/analytics.js, mismo origen): solo hace falta permitir su destino en connect-src
+  const script = ["'self'", ...hashes, ...clerkHosts, 'https://challenges.cloudflare.com', ...extra];
+  // Clerk (documentación actual de CSP): telemetría, Clerk Protect (antifraude/bots) y su servidor de imágenes
+  const clerkConnect = ['https://clerk-telemetry.com', 'https://*.clerk-telemetry.com', 'https://*.protect.clerk.com:*', 'https://img.clerk.com'];
+  const connect = ["'self'", ...tracker, ...clerkHosts, ...clerkConnect, ...extra];
   return [
     "default-src 'self'",
     `script-src ${script.join(' ')}`,
@@ -930,7 +966,7 @@ async function buildCsp(env: Env, html: string): Promise<string> {
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://img.clerk.com",
     `connect-src ${connect.join(' ')}`,
-    "frame-src 'self' https://challenges.cloudflare.com",
+    "frame-src 'self' https://challenges.cloudflare.com https://*.protect.clerk.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
@@ -988,7 +1024,11 @@ async function withSecurityHeaders(request: Request, env: Env, res: Response): P
     const embeddable = /^\/(p|c)\//.test(path); // /p/ y /c/ se pueden incrustar (código «insertar» del cuadro de publicación)
     if (embeddable && !headers.has('X-Robots-Tag')) headers.set('X-Robots-Tag', 'noindex'); // contenido de usuarios: no se indexa
     const mode = cleanEnv(env.CSP_MODE).toLowerCase() || 'report-only';
-    const text = await res.text();
+    let text = await res.text();
+    // Interruptor de emergencia: TRACKER_ENABLED=false retira el script de seguimiento de todas las páginas
+    // (y su origen de la CSP) sin tocar el código ni volver a desplegar.
+    const trackerEnabled = cleanEnv(env.TRACKER_ENABLED).toLowerCase() !== 'false';
+    if (!trackerEnabled) text = text.replace(/<!--tracker:start-->[\s\S]*?<!--tracker:end-->/g, '');
     body = text;
     headers.delete('content-length');
     headers.delete('content-encoding');
@@ -998,12 +1038,12 @@ async function withSecurityHeaders(request: Request, env: Env, res: Response): P
     }
     const ancestors = embeddable ? '' : "frame-ancestors 'self'";
     if (mode === 'enforce') {
-      const csp = await buildCsp(env, text);
+      const csp = await buildCsp(env, text, trackerEnabled);
       headers.set('Content-Security-Policy', ancestors ? `${csp}; ${ancestors}` : csp);
     } else {
       // frame-ancestors se ignora en Report-Only, así que va en una cabecera aparte siempre activa
       if (ancestors) headers.set('Content-Security-Policy', ancestors);
-      if (mode !== 'off') headers.set('Content-Security-Policy-Report-Only', await buildCsp(env, text));
+      if (mode !== 'off') headers.set('Content-Security-Policy-Report-Only', await buildCsp(env, text, trackerEnabled));
     }
   }
 
@@ -1146,6 +1186,94 @@ const worker = {
         authConfigured: identity.authConfigured,
         storageConfigured: /^https?:\/\//i.test(cleanEnv(env.SUPABASE_URL)) && Boolean(cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY)),
       });
+    }
+
+    // POST /api/pages/:slug/report  (público): denuncia una página por abuso
+    const reportMatch = path.match(/^\/api\/pages\/([^/]+)\/report$/);
+    if (reportMatch && request.method === 'POST') {
+      try {
+        const slug = decodeURIComponent(reportMatch[1]);
+        const ip = clientIp(request);
+        const rl = await rateGuard(env, `report:${ip}`, REPORT_LIMIT_PER_HOUR, 3600);
+        if (rl.limited) {
+          return tooManyRequests('Has enviado demasiadas denuncias seguidas. Inténtalo más tarde.', rl.retryAfter);
+        }
+        let body: any = {};
+        try {
+          body = await request.json();
+        } catch (_) {}
+        const reason = typeof body?.reason === 'string' ? body.reason : '';
+        if (!REPORT_REASONS.includes(reason)) {
+          return jsonResponse({ error: 'Indica el motivo de la denuncia.' }, 400);
+        }
+        const details = typeof body?.details === 'string' ? body.details.trim() : '';
+        const contact = typeof body?.contact === 'string' ? body.contact.trim() : '';
+        if (details.length > 1000) return jsonResponse({ error: 'Los detalles no pueden superar los 1000 caracteres.' }, 400);
+        if (contact.length > 200) return jsonResponse({ error: 'El dato de contacto no puede superar los 200 caracteres.' }, 400);
+        const page = await env.DB.prepare('SELECT slug FROM pages WHERE slug = ?').bind(slug).first<any>();
+        if (!page) return jsonResponse({ error: 'Página no encontrada' }, 404);
+
+        // La misma conexión no puede denunciar dos veces la misma página el mismo día
+        const dup = await rateGuard(env, `reportdup:${ip}:${slug}`, 1, 86400);
+        if (dup.limited) return jsonResponse({ success: true, duplicate: true });
+
+        await ensureReportsTable(env);
+        await env.DB.prepare(
+          'INSERT INTO reports (id, slug, reason, details, contact, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+          .bind(crypto.randomUUID(), slug, reason, details || null, contact || null, new Date().toISOString(), 'open')
+          .run();
+        return jsonResponse({ success: true }, 201);
+      } catch (err: any) {
+        return internalError(err, 'POST /api/pages/:slug/report');
+      }
+    }
+
+    // POST /api/me/erase: borra TODO lo del propietario (páginas, archivos, colecciones, estadísticas).
+    // Se llama repetidamente hasta que "remaining" sea 0 (lotes de 40, por el límite de peticiones de Workers).
+    if (path === '/api/me/erase' && request.method === 'POST') {
+      try {
+        if (!identity.userId) {
+          return jsonResponse({ error: 'No hay una identidad desde la que borrar datos.' }, 400);
+        }
+        let body: any = {};
+        try {
+          body = await request.json();
+        } catch (_) {}
+        if (body?.confirm !== true) {
+          return jsonResponse({ error: 'Falta la confirmación del borrado.' }, 400);
+        }
+        const rl = await rateGuard(env, `erase:${identity.userId}`, 30, 3600); // 30 lotes por hora
+        if (rl.limited) return tooManyRequests('Demasiadas operaciones seguidas. Inténtalo más tarde.', rl.retryAfter);
+
+        const other = identity.legacyUserId || identity.userId;
+        const batch = await env.DB.prepare('SELECT slug FROM pages WHERE user_id = ? OR user_id = ? LIMIT 40')
+          .bind(identity.userId, other)
+          .all<any>();
+        const deleted: string[] = [];
+        let failed = 0;
+        for (const row of batch.results || []) {
+          try {
+            await supabaseDelete(env, row.slug);
+            deleted.push(row.slug);
+          } catch (err) {
+            failed++;
+            console.error(`erase: no se pudo borrar el archivo de ${row.slug}:`, err);
+          }
+        }
+        if (deleted.length > 0) {
+          const placeholders = deleted.map(() => '?').join(',');
+          await env.DB.prepare(`DELETE FROM pages WHERE slug IN (${placeholders})`).bind(...deleted).run();
+          await deleteViewStats(env, deleted);
+        }
+        await env.DB.prepare('DELETE FROM collections WHERE user_id = ? OR user_id = ?').bind(identity.userId, other).run();
+        const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM pages WHERE user_id = ? OR user_id = ?')
+          .bind(identity.userId, other)
+          .first<any>();
+        return jsonResponse({ success: true, deletedPages: deleted.length, failed, remaining: left?.n || 0 });
+      } catch (err: any) {
+        return internalError(err, 'POST /api/me/erase');
+      }
     }
 
     // POST /api/identity/rotate  (solo anónimos): cambia el secreto anónimo y traslada a él todo lo propio.
@@ -1891,8 +2019,65 @@ const worker = {
         passwordProtectedPages: row?.pwd || 0,
         ephemeralPages: row?.eph || 0,
         totalCollections: cols?.n || 0,
+        openReports: await (async () => {
+          try {
+            await ensureReportsTable(env);
+            const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE status = 'open'").bind().first<any>();
+            return r?.n || 0;
+          } catch (_) {
+            return 0;
+          }
+        })(),
         storageDirectory: 'supabase://' + (env.SUPABASE_STORAGE_BUCKET || 'html-pages'),
       });
+    }
+
+    if (path === '/api/admin/reports' && request.method === 'GET') {
+      if (identity.role !== 'admin') return jsonResponse({ error: 'Acceso denegado.' }, 403);
+      try {
+        await ensureReportsTable(env);
+        const status = url.searchParams.get('status') === 'all' ? null : 'open';
+        const q =
+          'SELECT r.id, r.slug, r.reason, r.details, r.contact, r.created_at, r.status, r.resolved_at, p.title AS page_title, p.slug AS page_slug ' +
+          'FROM reports r LEFT JOIN pages p ON p.slug = r.slug ' +
+          (status ? "WHERE r.status = 'open' " : '') +
+          'ORDER BY r.created_at DESC LIMIT 100';
+        const res = await env.DB.prepare(q).bind().all<any>();
+        return jsonResponse({
+          reports: (res.results || []).map((r: any) => ({
+            id: r.id,
+            slug: r.slug,
+            reason: r.reason,
+            details: r.details || '',
+            contact: r.contact || '',
+            createdAt: r.created_at,
+            status: r.status,
+            resolvedAt: r.resolved_at || null,
+            pageTitle: r.page_title || null,
+            pageExists: Boolean(r.page_slug),
+          })),
+        });
+      } catch (err: any) {
+        return internalError(err, 'GET /api/admin/reports');
+      }
+    }
+
+    const reportAdminMatch = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
+    if (reportAdminMatch && request.method === 'PATCH') {
+      if (identity.role !== 'admin') return jsonResponse({ error: 'Acceso denegado.' }, 403);
+      try {
+        const body: any = await request.json().catch(() => ({}));
+        if (body?.status !== 'resolved' && body?.status !== 'dismissed') {
+          return jsonResponse({ error: 'Estado no válido.' }, 400);
+        }
+        await ensureReportsTable(env);
+        await env.DB.prepare('UPDATE reports SET status = ?, resolved_at = ? WHERE id = ?')
+          .bind(body.status, new Date().toISOString(), decodeURIComponent(reportAdminMatch[1]))
+          .run();
+        return jsonResponse({ success: true });
+      } catch (err: any) {
+        return internalError(err, 'PATCH /api/admin/reports/:id');
+      }
     }
 
     if (path === '/api/admin/purge-expired' && request.method === 'POST') {
@@ -1949,6 +2134,7 @@ const worker = {
     try {
       await purgeRateLimits(env);
       await purgeOldViewStats(env);
+      await purgeOldReports(env);
       const { purged, failed, pending } = await purgeExpired(env);
       console.log(`Limpieza programada: ${purged} borradas, ${failed} con error, ${pending} caducadas pendientes.`);
     } catch (err) {

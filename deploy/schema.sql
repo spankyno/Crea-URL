@@ -53,3 +53,16 @@ CREATE TABLE IF NOT EXISTS page_views_daily (
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (slug, day)
 );
+
+-- Denuncias de páginas por abuso (el Worker también la crea automáticamente si no existe)
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  details TEXT,
+  contact TEXT,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at);

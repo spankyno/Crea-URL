@@ -71,6 +71,7 @@ despliegues no las borran.
 | `CLERK_PUBLISHABLE_KEY` | Text | Sí | La misma `pk_test_...` / `pk_live_...` del frontend. De ella se deduce el emisor y las claves públicas para **verificar el token de sesión** |
 | `ADMIN_USER_IDS` | Text | Para el panel admin | IDs de usuario de Clerk (`user_...`) separados por comas. **Es la única forma de ser administrador**: ni correos, ni metadatos, ni el claim `role` conceden el rol (`ADMIN_EMAILS` quedó obsoleta y solo genera un aviso en los logs) |
 | `CLERK_ISSUER` | Text | No | Solo si usas un dominio propio de Clerk y no quieres derivarlo de la clave |
+| `TRACKER_ENABLED` | Text | No | `false` retira el script de seguimiento de todas las páginas (interruptor de emergencia) |
 | `CSP_MODE` | Text | No | `report-only` (por defecto: informa sin bloquear), `enforce` (bloquea) u `off` |
 | `ALLOWED_ORIGINS` | Text | No | Orígenes con acceso CORS a la API, separados por comas (el propio origen siempre se permite) |
 | `CSP_EXTRA_SOURCES` | Text | No | Orígenes extra permitidos en `script-src` y `connect-src`, separados por espacios |
@@ -147,10 +148,12 @@ El bucket `html-pages` de Supabase **debe ser privado**: el Worker accede con la
 - **CORS:** ya no es `*`. Solo se responde al propio origen y a los de `ALLOWED_ORIGINS`.
 - **CSP (política de contenido):** por defecto en modo **informe** (`Content-Security-Policy-Report-Only`): no bloquea nada, solo registra en los logs del Worker las cosas que bloquearía (`[CSP] ...`). Los `<script>` en línea de `index.html` y `/acerca-de` se autorizan por *hash*, calculado al servir cada página.
 - **Cómo pasar a bloqueo, paso a paso:**
-  1. Despliega y usa la aplicación como lo haría un usuario: inicia sesión con Clerk, publica, abre el panel, genera un QR, exporta un ZIP.
-  2. Revisa *Observability → Logs* buscando `[CSP]`.
-  3. Si aparece algo legítimo (p. ej. un dominio de Clerk), añádelo en `CSP_EXTRA_SOURCES`.
-  4. Cuando no haya avisos, define `CSP_MODE=enforce`. Si algo fallara, vuelve a `report-only` u `off` sin tocar código.
+  1. Despliega (queda en modo informe: no bloquea nada). Comprueba en *DevTools → Network → (el documento) → Response Headers* que aparece `Content-Security-Policy-Report-Only`.
+  2. Abre la aplicación en una ventana de **incógnito sin extensiones** (las extensiones generan avisos falsos con `chrome-extension://`) y, con la consola abierta filtrando por «Content Security Policy» o «Report Only», recorre todo: portada, **registro e inicio de sesión (con cada método que tengas activado)**, menú de usuario / gestionar cuenta, cerrar sesión, publicar, editar, panel (QR, exportar ZIP), colecciones, Admin, una página pública, `/acerca-de`, `/privacidad`, denunciar y «Eliminar todos mis datos».
+  3. Cada aviso legítimo (un dominio de Clerk, de Cloudflare…) hay que permitirlo; lo desconocido, investigarlo. También llegan al *log* del Worker como `[CSP]` (*Observability → Logs*).
+  4. Si algo necesita `script-src` o `connect-src`, añádelo en `CSP_EXTRA_SOURCES` (separados por espacios). **Ojo:** esa variable solo amplía `script-src` y `connect-src`; si una función de Clerk necesitara además `frame-src` o `img-src` hay que cambiar el código (`buildCsp`).
+  5. Cuando no haya avisos legítimos tras uno o dos días de uso real, define `CSP_MODE=enforce` y **repite el recorrido completo enseguida**. Si algo fallara, vuelve a `report-only` (o `off`) sin tocar código.
+- **Clerk:** la política incluye lo que documenta Clerk (`*.clerk-telemetry.com`, Clerk Protect `*.protect.clerk.com`, `img.clerk.com`, `challenges.cloudflare.com`) y el servidor de Clerk de tu instancia, que se deduce de `CLERK_PUBLISHABLE_KEY`. Funciones como Billing (`api.stripe.com`) o autocompletar direcciones (`maps.googleapis.com`) no se usan y no están permitidas. Al pasar a claves de producción, repite el recorrido.
 - **Vista previa y páginas publicadas (SEC-18):** el HTML de los usuarios se muestra en `/preview-frame`, una página que el Worker sirve con `Content-Security-Policy: sandbox ...` (sin `allow-same-origin`), de modo que el contenido tiene un origen opaco y no puede leer la sesión de la aplicación. Se abre así tanto en el iframe como en «abrir en pestaña nueva» (antes usaba un `blob:` que heredaba el origen de la aplicación). **No uses `srcDoc` ni `blob:` para HTML de usuarios.**
 - No se envía `Cross-Origin-Opener-Policy`: podría romper el inicio de sesión de Clerk en ventana emergente.
 
@@ -174,3 +177,20 @@ El bucket `html-pages` de Supabase **debe ser privado**: el Worker accede con la
   `--test-scheduled` expone `/__scheduled?cron=0+*+*+*+*` para probar la limpieza horaria.
 - **Tras desplegar, comprueba:** (1) en el registro de compilación aparece Node ≥ 22 y wrangler 4.149; (2) cargan un enlace directo a una página tuya (`/p/...`) y `/collections`; (3) `/assets/no-existe.js` da 404; (4) publicar y ver una página funcionan; (5) el *cron trigger* sigue listado en el Worker.
 - **Si algo falla y necesitas volver atrás:** restaura `package.json`, `package-lock.json` y `wrangler.toml` de la versión anterior (y borra `.node-version`). Para recuperar solo el comportamiento anterior de las rutas, vuelve a añadir `not_found_handling = "single-page-application"` en `[assets]`.
+
+## Denuncias, privacidad y seguimiento (SEC-03, SEC-04, SEC-17)
+
+- **Denuncias:** cada página pública muestra, en una franja inferior fija, «Contenido creado por un usuario; no se revisa antes de publicarse» y
+  el enlace **«Denunciar esta página»** (motivo, detalles y un contacto opcional). `POST /api/pages/:slug/report`, sin cuenta; límite de 5 por IP y hora y
+  una sola denuncia por IP y página al día. Se guardan en la tabla `reports` (se crea sola; también está en `schema.sql`).
+  Como administrador las ves en la pestaña **Admin → Denuncias abiertas**: *Ver página*, *Eliminar página* (la borra y resuelve la denuncia) o *Descartar*.
+  Las resueltas o descartadas se borran a los 90 días (cron).
+- **Borrar todos mis datos:** botón en **Mi Dashboard → Mis datos** (`POST /api/me/erase`, por lotes de 40, también para invitados). Elimina páginas, archivos,
+  colecciones y estadísticas. La cuenta de Clerk se elimina aparte desde el perfil del usuario.
+- **Página `/privacidad`:** datos tratados, conservación, derechos y normas de uso. Enlazada desde el pie de la aplicación y de `/acerca-de`.
+  Es un texto de partida, no asesoramiento legal: revísalo (sobre todo lo que dice del servicio de analítica) y ajusta lo que no se corresponda con tu caso.
+- **Seguimiento (Aitor's Hub Dashboard):** el script **no se carga del dashboard**. `public/analytics.js` es una *copia fija y revisada* del `tracker.js` original (su cabecera indica el SHA-256 del original revisado y la única diferencia: la API está fijada, porque el original la deriva del origen desde el que se carga). Se sirve desde este mismo origen, así que **su contenido no puede cambiar sin un despliegue de este repositorio**: un compromiso del Worker del dashboard ya no puede ejecutar código en la aplicación. Solo envía la aplicación y la ruta de la página (`POST /api/v1/visit`); no usa cookies ni almacenamiento, y **no envía ningún identificador de usuario**, así que se mide a todos los visitantes (con o sin sesión) sin poder vincular visitas a cuentas. Va en una etiqueta `<script src="/analytics.js" ...>` entre `<!--tracker:start-->` y `<!--tracker:end-->` en `index.html`, `/acerca-de` y `/privacidad`. La CSP permite `connect-src` hacia el dashboard, pero no `script-src`. **Interruptor de emergencia:** `TRACKER_ENABLED=false` en Cloudflare (variable de texto) lo retira de todas las páginas y de la CSP al instante, sin desplegar. **Mantenimiento:** si cambias el `tracker.js` original, revisa el cambio y trae aquí lo que corresponda a mano.
+
+## Pruebas
+
+`npm run test:e2e` ejecuta el Worker real en `workerd` con una D1 real y Supabase/Clerk simulados. Detalles en `tests/e2e/README.md`.
