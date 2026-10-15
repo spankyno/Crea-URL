@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacidad y normas de uso | Crea URL</title>
-  <meta name="description" content="Qué datos trata Crea URL, para qué, cuánto tiempo los conserva, tus derechos y las normas de uso del servicio, incluida la forma de denunciar una página.">
+  <title>Política de privacidad y normas de uso | Crea URL</title>
+  <meta name="description" content="Información sobre el tratamiento de datos personales, las cookies, los derechos de los usuarios y las normas de uso de Crea URL.">
   <meta name="author" content="Aitor Sánchez Gutiérrez">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://crea-url.kbo1.workers.dev/privacidad">
@@ -12,8 +12,8 @@
   <meta property="og:locale" content="es_ES">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://crea-url.kbo1.workers.dev/privacidad">
-  <meta property="og:title" content="Privacidad y normas de uso | Crea URL">
-  <meta property="og:description" content="Qué datos trata Crea URL, cuánto tiempo los conserva, tus derechos y las normas de uso del servicio.">
+  <meta property="og:title" content="Política de privacidad y normas de uso | Crea URL">
+  <meta property="og:description" content="Información sobre el tratamiento de datos personales, las cookies, los derechos de los usuarios y las normas de uso de Crea URL.">
   <meta property="og:image" content="https://crea-url.kbo1.workers.dev/og-image.jpg">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
@@ -107,6 +107,11 @@
     .links a.card:hover { border-color: var(--accent); }
     .links .url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: var(--accent); word-break: break-all; margin-top: 6px; display: block; }
     footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--muted); font-size: 14px; text-align: center; }
+    .legal h2 { font-size: 21px; margin: 0 0 10px; }
+    .legal p, .legal li { color: var(--text); font-size: 15.5px; line-height: 1.75; margin: 0 0 12px; }
+    .legal ul { margin: 0 0 12px; padding-left: 22px; }
+    .legal section { padding: 26px 0; }
+    .legal .lead-legal { color: var(--muted); font-size: 16px; }
   </style>
 </head>
 <body>
@@ -117,8 +122,8 @@
       <div class="head-right">
       <nav aria-label="Secciones de la página">
         <a href="#datos">Datos</a>
-        <a href="#conservacion">Conservación</a>
-        <a href="#derechos">Tus derechos</a>
+        <a href="#derechos">Derechos</a>
+        <a href="#cookies">Cookies</a>
         <a href="#normas">Normas de uso</a>
         <a href="#denunciar">Denunciar</a>
       </nav>
@@ -130,86 +135,83 @@
     </div>
   </header>
 
-  <main class="wrap" id="contenido">
-    <div class="hero">
-      <span class="badge">Transparencia</span>
-      <h1>Privacidad y normas de uso</h1>
-      <p class="lead">Qué datos trata Crea URL, para qué, cuánto tiempo los conserva, cómo ejercer tus derechos y qué se puede (y qué no) publicar. Última actualización: 14 de octubre de 2026.</p>
+  <main class="wrap legal" id="contenido">
+    <div class="hero" style="padding-bottom:8px">
+      <h1>Política de privacidad y normas de uso</h1>
+      <p class="lead-legal">Última actualización: 15 de octubre de 2026.</p>
+      <p>En cumplimiento del Reglamento (UE) 2016/679 del Parlamento Europeo y del Consejo (RGPD), de la Ley Orgánica 3/2018, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD) y de la Ley 34/2002, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa a los usuarios de Crea URL (en adelante, el «Servicio») sobre el tratamiento de sus datos personales y sobre las condiciones de uso del Servicio.</p>
     </div>
 
     <section id="responsable" aria-labelledby="responsable-titulo">
-      <h2 id="responsable-titulo">Quién es el responsable</h2>
-      <p class="sub">El responsable del tratamiento es <strong style="color:var(--title)">Aitor Sánchez Gutiérrez</strong>. Para cualquier asunto sobre tus datos puedes escribir desde la página de <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">contacto</a>.</p>
+      <h2 id="responsable-titulo">1. Responsable del tratamiento</h2>
+      <p>El responsable del tratamiento de los datos personales es Aitor Sánchez Gutiérrez (en adelante, el «Responsable»). El usuario puede ponerse en contacto con él a través de la <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">página de contacto</a>.</p>
     </section>
 
     <section id="datos" aria-labelledby="datos-titulo">
-      <h2 id="datos-titulo">Qué datos se tratan y para qué</h2>
-      <p class="sub">Solo los necesarios para prestar el servicio y protegerlo de abusos.</p>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Dato</th><th>Para qué</th><th>Detalle</th></tr></thead>
-          <tbody>
-            <tr><td>Cuenta (opcional)</td><td>Iniciar sesión y gestionar tus páginas</td><td>Correo, nombre, foto e identificador de usuario, gestionados por Clerk. Publicar como invitado no requiere cuenta.</td></tr>
-            <tr><td>Páginas y colecciones</td><td>Alojar y servir lo que publicas</td><td>El HTML, el título, la descripción, el tamaño, las fechas y el propietario. La contraseña de una página se guarda cifrada (hash), nunca en claro.</td></tr>
-            <tr><td>Identificador de invitado</td><td>Que puedas gestionar tus páginas sin cuenta</td><td>Es un secreto que se guarda en tu navegador. En la base de datos solo se guarda su huella (hash), no el secreto.</td></tr>
-            <tr><td>Visitas</td><td>Mostrarte estadísticas</td><td>Número total de visitas y visitas por día de cada página. No se guarda la IP ni el navegador de quien visita.</td></tr>
-            <tr><td>Dirección IP</td><td>Limitar el abuso (por ejemplo, publicaciones o intentos de contraseña en exceso)</td><td>Solo se usa de forma transitoria en contadores que se eliminan automáticamente al cabo de minutos, horas o, como máximo, un día. No se guarda junto a tu contenido.</td></tr>
-            <tr><td>Denuncias</td><td>Atender los abusos que se comuniquen</td><td>Página denunciada, motivo, detalles y, si quien denuncia lo desea, un dato de contacto.</td></tr>
-            <tr><td>Registros técnicos</td><td>Diagnosticar errores y detectar problemas de seguridad</td><td>Registros de error del servidor, gestionados por Cloudflare.</td></tr>
-            <tr><td>Analítica del sitio</td><td>Medir las visitas a la aplicación</td><td>Se envía a un panel de analítica propio del responsable la ruta de la página visitada (por ejemplo, <code>/acerca-de</code>) y, como en cualquier conexión, tu dirección IP. No usa cookies ni almacenamiento del navegador. La ruta y la IP se conservan en ese panel hasta que solicites su supresión.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <h3 style="margin-top:22px">Datos guardados en tu navegador</h3>
-      <p class="sub" style="margin-bottom:0">La aplicación guarda en tu navegador (almacenamiento local) el borrador del editor, el tema claro u oscuro y tu identificador de invitado. Si inicias sesión, Clerk usa cookies necesarias para mantener la sesión. No se usan cookies publicitarias.</p>
-      <h3 style="margin-top:22px">Proveedores que intervienen</h3>
-      <p class="sub" style="margin-bottom:0">Cloudflare (alojamiento y base de datos), Supabase (almacenamiento de los archivos publicados), Clerk (autenticación) y Google Fonts (las tipografías se solicitan a los servidores de Google al cargar la página). Alguno de ellos puede tratar datos fuera del Espacio Económico Europeo con las garantías que cada proveedor ofrece.</p>
+      <h2 id="datos-titulo">2. Datos personales que se tratan</h2>
+      <p>En función del uso que el usuario haga del Servicio, el Responsable podrá tratar las siguientes categorías de datos: datos identificativos y de cuenta, como el nombre, el correo electrónico y el identificador de usuario, cuando el usuario decide registrarse; los contenidos que publica y la información asociada a ellos; datos de navegación y técnicos, como la dirección IP y las páginas visitadas; y la información que el usuario facilite voluntariamente al comunicar una incidencia o denunciar una página.</p>
+      <p>Los datos se obtienen directamente del propio usuario o de su navegación por el Servicio.</p>
+    </section>
+
+    <section id="finalidad" aria-labelledby="finalidad-titulo">
+      <h2 id="finalidad-titulo">3. Finalidades y base jurídica del tratamiento</h2>
+      <p>Los datos personales se tratan con las siguientes finalidades y bases jurídicas:</p>
+      <ul>
+        <li>Prestar el Servicio y gestionar la cuenta y los contenidos del usuario, sobre la base de la ejecución de la relación contractual derivada de la aceptación de las presentes condiciones (artículo 6.1.b del RGPD).</li>
+        <li>Garantizar la seguridad del Servicio, prevenir abusos y fraudes y atender las denuncias recibidas, así como elaborar estadísticas de uso, sobre la base del interés legítimo del Responsable (artículo 6.1.f del RGPD).</li>
+        <li>Atender las solicitudes y el ejercicio de derechos de los interesados y cumplir las obligaciones legales aplicables (artículo 6.1.c del RGPD).</li>
+        <li>Cualquier otra finalidad para la que el usuario haya prestado su consentimiento (artículo 6.1.a del RGPD), que podrá retirar en cualquier momento sin que ello afecte a la licitud del tratamiento previo a su retirada.</li>
+      </ul>
+      <p>La comunicación de los datos necesarios para el registro es obligatoria para utilizar las funciones que lo requieren; en caso contrario no será posible prestarlas. No se adoptan decisiones automatizadas ni se elaboran perfiles con efectos jurídicos sobre el usuario.</p>
     </section>
 
     <section id="conservacion" aria-labelledby="conservacion-titulo">
-      <h2 id="conservacion-titulo">Cuánto tiempo se conservan</h2>
-      <p class="sub">Los contenidos y los datos técnicos se eliminan automáticamente (una limpieza programada se ejecuta cada hora). Los datos de analítica se conservan hasta que solicites su supresión.</p>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Dato</th><th>Conservación</th></tr></thead>
-          <tbody>
-            <tr><td>Página publicada como invitado</td><td>15 días (se puede prorrogar desde el panel)</td></tr>
-            <tr><td>Página publicada con cuenta</td><td>90 días (se puede prorrogar)</td></tr>
-            <tr><td>Página efímera</td><td>1 hora</td></tr>
-            <tr><td>Estadísticas diarias de visitas</td><td>Hasta 400 días, y se borran con la página</td></tr>
-            <tr><td>Contadores de límites (IP)</td><td>Entre minutos y 24 horas</td></tr>
-            <tr><td>Denuncias</td><td>Hasta que se resuelven y 90 días después</td></tr>
-            <tr><td>Analítica del sitio (ruta de la página e IP)</td><td>Hasta que solicites su supresión</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2 id="conservacion-titulo">4. Plazo de conservación</h2>
+      <p>Los datos personales se conservarán mientras sean necesarios para las finalidades descritas y, en el caso de los datos de navegación tratados con fines estadísticos, hasta que el interesado solicite su supresión. Los contenidos publicados se mantendrán durante el periodo de vigencia que el Servicio indique en cada caso y, transcurrido este, serán eliminados.</p>
+    </section>
+
+    <section id="destinatarios" aria-labelledby="destinatarios-titulo">
+      <h2 id="destinatarios-titulo">5. Destinatarios y transferencias internacionales</h2>
+      <p>Los datos personales no se cederán a terceros, salvo obligación legal. El Servicio se apoya en proveedores que actúan como encargados del tratamiento y que prestan servicios de alojamiento, almacenamiento, autenticación y entrega de recursos, entre ellos Cloudflare, Supabase, Clerk y Google Fonts.</p>
+      <p>Alguno de estos proveedores puede tratar datos fuera del Espacio Económico Europeo. En tal caso, se aplicarán las garantías adecuadas previstas en el RGPD que cada proveedor ofrece, como las cláusulas contractuales tipo o las decisiones de adecuación de la Comisión Europea.</p>
     </section>
 
     <section id="derechos" aria-labelledby="derechos-titulo">
-      <h2 id="derechos-titulo">Tus derechos</h2>
-      <p class="sub">Puedes acceder a tus datos, rectificarlos, suprimirlos, oponerte a su tratamiento, limitarlo y solicitar su portabilidad.</p>
-      <div class="grid">
-        <div class="card"><h3>Borrar todo, al instante</h3><p>En el <strong>Panel de Control</strong>, sección «Mis datos», el botón «Eliminar todos mis datos» borra tus páginas, archivos, colecciones y estadísticas. Funciona también como invitado.</p></div>
-        <div class="card"><h3>Eliminar tu cuenta</h3><p>Hazlo desde tu perfil de usuario (menú de tu avatar). Conviene borrar antes tus datos desde el panel, porque cerrar la cuenta no elimina por sí sola tus páginas.</p></div>
-        <div class="card"><h3>Cualquier otra petición</h3><p>Escríbenos desde la página de <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">contacto</a>, también para pedir la supresión de los datos de analítica asociados a tu IP. Si consideras que tus datos no se tratan correctamente, también puedes reclamar ante la <a href="https://www.aepd.es" target="_blank" rel="noopener noreferrer">Agencia Española de Protección de Datos</a>.</p></div>
-      </div>
+      <h2 id="derechos-titulo">6. Derechos de los interesados</h2>
+      <p>El usuario puede ejercer los derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y portabilidad, así como retirar el consentimiento prestado, dirigiéndose al Responsable a través de la <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">página de contacto</a>, identificándose y concretando su solicitud. Además, la aplicación permite eliminar los contenidos y datos asociados a una cuenta o a un identificador de invitado desde el Panel de Control.</p>
+      <p>Si el usuario considera que el tratamiento de sus datos no se ajusta a la normativa, puede presentar una reclamación ante la <a href="https://www.aepd.es" target="_blank" rel="noopener noreferrer">Agencia Española de Protección de Datos</a>.</p>
+    </section>
+
+    <section id="cookies" aria-labelledby="cookies-titulo">
+      <h2 id="cookies-titulo">7. Cookies y tecnologías similares</h2>
+      <p>El Servicio utiliza únicamente cookies y tecnologías de almacenamiento local de carácter técnico, necesarias para su funcionamiento y para mantener la sesión del usuario, incluidas las del proveedor de autenticación, por lo que están exentas del deber de obtener consentimiento conforme al artículo 22.2 de la LSSI-CE. No se utilizan cookies publicitarias ni de seguimiento. La herramienta de analítica del Servicio no utiliza cookies ni almacenamiento del dispositivo.</p>
+      <p>El usuario puede configurar su navegador para bloquear o eliminar estas tecnologías, si bien ello podría afectar al funcionamiento del Servicio.</p>
+    </section>
+
+    <section id="seguridad" aria-labelledby="seguridad-titulo">
+      <h2 id="seguridad-titulo">8. Seguridad</h2>
+      <p>El Responsable aplica las medidas técnicas y organizativas apropiadas para proteger los datos personales frente a accesos no autorizados, pérdida o alteración, atendiendo al estado de la técnica y a la naturaleza de los datos tratados.</p>
+    </section>
+
+    <section id="menores" aria-labelledby="menores-titulo">
+      <h2 id="menores-titulo">9. Menores de edad</h2>
+      <p>El Servicio no está dirigido a menores de 14 años. Si el Responsable tuviera conocimiento de que se han recabado datos de un menor de dicha edad sin la autorización de sus representantes legales, procederá a suprimirlos.</p>
     </section>
 
     <section id="normas" aria-labelledby="normas-titulo">
-      <h2 id="normas-titulo">Normas de uso</h2>
-      <p class="sub">Crea URL aloja lo que los usuarios publican y <strong style="color:var(--title)">no lo revisa antes de mostrarlo</strong>. Al publicar te comprometes a no usar el servicio para:</p>
-      <ul style="color:var(--muted);padding-left:20px;margin:0">
-        <li>Suplantar a terceros o capturar datos de forma engañosa (<em>phishing</em>), por ejemplo con formularios que simulan un servicio real.</li>
-        <li>Distribuir malware o contenido dañino para los dispositivos de quien lo visita.</li>
-        <li>Publicar contenido ilegal o que vulnere derechos de autor, de imagen o de privacidad de otras personas.</li>
-        <li>Difundir datos personales de terceros sin su permiso, o enviar <em>spam</em>.</li>
-      </ul>
-      <p class="sub" style="margin-top:14px;margin-bottom:0">Las páginas que incumplan estas normas pueden retirarse <strong style="color:var(--title)">sin previo aviso</strong>, y se pueden limitar o bloquear los usos abusivos del servicio.</p>
+      <h2 id="normas-titulo">10. Normas de uso</h2>
+      <p>El Servicio aloja contenidos publicados por los usuarios, que son los únicos responsables de los mismos; el Responsable no los revisa con carácter previo a su publicación. Queda prohibido utilizar el Servicio para suplantar la identidad de terceros u obtener datos de forma engañosa; distribuir software malicioso; publicar contenidos ilícitos o que vulneren derechos de propiedad intelectual, al honor, a la intimidad o a la protección de datos de terceros; o realizar un uso abusivo del Servicio.</p>
+      <p>Los contenidos que incumplan estas normas podrán ser retirados sin previo aviso, y podrán limitarse o bloquearse los usos abusivos del Servicio.</p>
     </section>
 
     <section id="denunciar" aria-labelledby="denunciar-titulo">
-      <h2 id="denunciar-titulo">Cómo denunciar una página</h2>
-      <p class="sub">Cada página publicada muestra en su parte inferior un enlace <strong style="color:var(--title)">«Denunciar esta página»</strong>: elige el motivo, añade detalles si quieres y envíalo. Las denuncias se revisan manualmente y, si procede, la página se elimina. Si quieres dejar un dato de contacto para que te respondamos, es opcional. Para reclamaciones por derechos de autor o privacidad que requieran más información, escribe desde la página de <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">contacto</a>.</p>
+      <h2 id="denunciar-titulo">11. Denuncia de contenidos</h2>
+      <p>Cualquier persona puede denunciar una página mediante el enlace «Denunciar esta página» que figura en su parte inferior, indicando el motivo y, si lo desea, un dato de contacto. Las denuncias se revisan y, si procede, el contenido se retira. Para las reclamaciones por derechos de autor o de protección de datos que requieran más información, puede contactarse con el Responsable a través de la <a href="https://aitorsanchez.pages.dev/contacto" target="_blank" rel="noopener noreferrer">página de contacto</a>.</p>
+    </section>
+
+    <section id="cambios" aria-labelledby="cambios-titulo">
+      <h2 id="cambios-titulo">12. Modificaciones y legislación aplicable</h2>
+      <p>El Responsable podrá modificar esta política para adaptarla a novedades legislativas o a cambios en el Servicio. La versión vigente es la publicada en esta página, con indicación de la fecha de su última actualización. Esta política se rige por la legislación española.</p>
     </section>
   </main>
 

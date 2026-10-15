@@ -171,7 +171,7 @@ r=await call('POST','/api/me/erase',{id:AE,body:{confirm:true}}); T('un invitado
 r=await call('POST','/api/me/erase',{id:'anon_'+'otroSecretoCualquiera00000',body:{confirm:true}}); T('con un secreto ajeno no se borra nada',r.s===200&&r.j.deletedPages===0&&store.has('e2e-keep.html'));
 
 console.log('\n[K] Páginas estáticas, privacidad y seguimiento (SEC-03, SEC-04, SEC-17)');
-r=await call('GET','/privacidad'); T('GET /privacidad → 200 con normas de uso y forma de denunciar',r.s===200&&/Normas de uso/.test(r.t)&&/Denunciar esta página/.test(r.t)&&/Tus derechos/.test(r.t));
+r=await call('GET','/privacidad'); T('GET /privacidad → 200 con responsable, derechos, cookies, normas de uso y denuncia',r.s===200&&/Responsable del tratamiento/.test(r.t)&&/Derechos de los interesados/.test(r.t)&&/Cookies y tecnologías similares/.test(r.t)&&/id="normas"/.test(r.t)&&/id="denunciar"/.test(r.t)&&/Agencia Española de Protección de Datos/.test(r.t));
 T('  indexable (sin noindex) y con su canonical',!/noindex/.test(r.h.get('x-robots-tag')||'')&&/rel="canonical" href="[^"]*\/privacidad"/.test(r.t));
 r=await call('GET','/sitemap.xml'); T('el sitemap incluye /privacidad',/\/privacidad</.test(r.t));
 r=await call('GET','/'); T('el seguimiento va entre marcadores y es una etiqueta normal que apunta a la copia PROPIA (/analytics.js)',/<!--tracker:start-->/.test(r.t)&&/<script src="\/analytics\.js" data-app="crea-url" data-key="ak_[0-9a-f]+" async><\/script>/.test(r.t)&&!/tracker\.js/.test(r.t));
