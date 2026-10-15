@@ -4,7 +4,7 @@ Esta guía detalla paso a paso cómo configurar los servicios gratuitos de **Sup
 
 ---
 
-## 1. Configuración de Supabase Storage (Almacenamiento Gratuito)
+## 1. Configuración de Supabase Storage (Almacenamiento Gratuito) 
 
 Supabase ofrece un plan gratuito que incluye **1 GB de almacenamiento** y **2 GB de ancho de banda mensual**.
 
